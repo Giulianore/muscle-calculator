@@ -967,3 +967,28 @@ button,.chip,.tab,.food,.cal-cell,.reco-row,.slot,.log-row{touch-action:manipula
 .cs-total b{font-size:20px;color:var(--txt);font-variant-numeric:tabular-nums}
 .cb-left{background:none;border:0;padding:0;cursor:pointer;display:flex;align-items:center;gap:10px;font-family:inherit}
 .cart-wrap{display:contents}
+
+/* ---------------- BMI 卡片 ---------------- */
+.bmi-top{display:flex;align-items:center;gap:14px;margin:4px 0 10px}
+.bmi-num{font-size:40px;font-weight:800;letter-spacing:-.04em;line-height:1;font-variant-numeric:tabular-nums}
+.bmi-num.ok{color:#3ddc84}.bmi-num.low{color:#ffc078}.bmi-num.high{color:#ff8a80}
+.bmi-right{display:flex;flex-direction:column;gap:4px}
+.bmi-cat{font-size:11px;font-weight:750;padding:3px 9px;border-radius:99px;align-self:flex-start}
+.bmi-cat.ok{background:rgba(61,220,132,.14);color:#3ddc84}
+.bmi-cat.low{background:rgba(255,159,10,.14);color:#ffb454}
+.bmi-cat.high{background:rgba(255,69,58,.14);color:#ff8a80}
+.bmi-sub2{font-size:10.5px;color:var(--dim-2)}
+.bmi-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11.5px;color:var(--dim);margin:10px 0}
+.bmi-flag{font-size:9.5px;font-weight:700;padding:2px 7px;border-radius:6px}
+.bmi-flag.ok{background:rgba(61,220,132,.14);color:#3ddc84}
+.bmi-flag.mid{background:rgba(255,159,10,.14);color:#ffb454}
+.bmi-flag.high{background:rgba(255,69,58,.14);color:#ff8a80}
+.bmi-scale{display:flex;gap:2px;height:6px;border-radius:99px;overflow:hidden;margin-top:10px}
+.bmi-scale i{display:block;height:100%}
+.bmi-scale i:nth-child(1){background:#ffd60a}
+.bmi-scale i:nth-child(2){background:#3ddc84}
+.bmi-scale i:nth-child(3){background:#ff9f0a}
+.bmi-scale i:nth-child(4){background:#ff453a}
+.bmi-ticks{display:flex;justify-content:space-between;font-size:9px;color:var(--dim-2);margin-top:4px;padding:0 2px}
+.bmi-num.mid{color:#ffb454}
+.bmi-cat.mid{background:rgba(255,159,10,.14);color:#ffb454}

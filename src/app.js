@@ -15,6 +15,7 @@ const DEFAULTS = {
   height: 175,
   weight: 72,
   age: 27,
+  waist: 0,                    // 腰围 cm，0 = 未填
   sessions: 4,
   trainTime: 'evening_after',
   cart: [],                    // 购物车 [{cat,id,g,method,serv}]
@@ -90,7 +91,16 @@ function compute() {
 
   /* ---- ⓪ 参考体重：BMI ≥ 28 时按理想体重折算（国内临床惯用做法） ---- */
   const bmi = w / ((h / 100) ** 2);
-  const ibw = 22 * ((h / 100) ** 2);
+  // 中国标准（WS/T 428-2013 / 肥胖症中国诊疗指南 2024）：<18.5 偏瘦，18.5–23.9 正常，24–27.9 超重，≥28 肥胖
+  const bmiCat = bmi < 18.5 ? '偏瘦' : bmi < 24 ? '正常' : bmi < 28 ? '超重' : '肥胖';
+  const hm = h / 100;
+  const healthyMin = 18.5 * hm * hm, healthyMax = 23.9 * hm * hm;
+  // 中心性肥胖：男 ≥90 cm、女 ≥85 cm（2024 指南）；腰高比 ≥0.5 为风险增高（NICE NG246）
+  const waist = state.waist > 0 ? state.waist : null;
+  const whtr = waist ? waist / h : null;
+  const central = waist ? (state.sex === 'm' ? waist >= 90 : waist >= 85) : null;
+  const centralWarn = waist ? (state.sex === 'm' ? waist >= 85 && waist < 90 : waist >= 80 && waist < 85) : null;
+  const ibw = 22 * hm * hm;
   const refW = bmi >= 28 ? ibw : w;
 
   /* ---- ① 热量：只设上限 40 kcal/kg（防止公式在极端体型上跑飞），并设安全下限 ---- */
@@ -171,6 +181,8 @@ function compute() {
     pRange: sc.proteinRange || [pPerKg, pPerKg],
     scene: sc, adjusted, guards, diet, dietNote,
     refW: round(refW, 1), bmi: round(bmi, 1), useIbw: bmi >= 28,
+    bmiCat, healthyMin: Math.round(healthyMin), healthyMax: Math.round(healthyMax),
+    waist, whtr: whtr ? round(whtr, 2) : null, central, centralWarn,
     weekly,
     perMealP: round(protein / state.meals),
     water: round(w * 0.035, 1),
@@ -246,6 +258,15 @@ function renderInput() {
     ${sliderHTML('height', '身高', state.height, 145, 205, 1, 'cm')}
     ${sliderHTML('weight', '体重', state.weight, 40, 130, 0.5, 'kg')}
     ${sliderHTML('age', '年龄', state.age, 15, 65, 1, '岁')}
+    <div class="field">
+      <div class="field-head">
+        <span class="field-label">腰围（可不填）</span>
+        <span class="field-value" id="fv-waist">${state.waist > 0 ? state.waist + '<small>cm</small>' : '<span style="font-size:13px;color:var(--dim-2)">未填</span>'}</span>
+      </div>
+      <input type="range" data-slider="waist" min="0" max="140" step="1" value="${state.waist}"
+        style="--p:${state.waist / 140 * 100}%" aria-label="腰围">
+      <div class="card-hint" style="margin-top:6px">脐上一指水平绕一圈。男性 ≥90 cm、女性 ≥85 cm 属中心性肥胖。</div>
+    </div>
   </div>
 
   <div class="card">
@@ -286,18 +307,66 @@ function renderInput() {
   `;
 }
 
+/* BMI / 腰围 卡片 */
+function bmiCard(r) {
+  const tone = r.bmiCat === '正常' ? 'ok' : r.bmiCat === '偏瘦' ? 'low' : r.bmiCat === '超重' ? 'mid' : 'high';
+  const waistHtml = r.waist
+    ? `<div class="bmi-line">
+        <span>腰围 ${r.waist} cm</span>
+        <span class="bmi-flag ${r.central ? 'high' : r.centralWarn ? 'mid' : 'ok'}">${
+          r.central ? '中心性肥胖' : r.centralWarn ? '偏高' : '正常'
+        }</span>
+        <span class="bmi-sub2">腰高比 ${r.whtr}${r.whtr >= 0.5 ? '（≥0.5）' : ''}</span>
+      </div>`
+    : `<div class="bmi-line"><span class="bmi-sub2">填腰围可以进一步判断内脏脂肪风险</span></div>`;
+
+  return `<div class="card">
+    <div class="card-title"><h3>BMI 与腰围</h3><span class="card-hint">中国标准</span></div>
+    <div class="bmi-top">
+      <div class="bmi-num ${tone}">${r.bmi}</div>
+      <div class="bmi-right">
+        <span class="bmi-cat ${tone}">${r.bmiCat}</span>
+        <div class="bmi-sub2">健康体重 ${r.healthyMin}–${r.healthyMax} kg</div>
+      </div>
+    </div>
+    ${waistHtml}
+    <div class="bmi-scale">
+      <i style="flex:${Math.max(0, Math.min(r.bmi, 18.5) - 14)}"></i>
+      <i style="flex:${Math.max(0, Math.min(r.bmi, 24) - 18.5)}"></i>
+      <i style="flex:${Math.max(0, Math.min(r.bmi, 28) - 24)}"></i>
+      <i style="flex:${Math.max(0, Math.min(r.bmi, 36) - 28)}"></i>
+    </div>
+    <div class="bmi-ticks"><span>18.5</span><span>24</span><span>28</span></div>
+    <p class="lead" style="margin-top:10px">${bmiMessage(r)}</p>
+  </div>`;
+}
+
+function bmiMessage(r) {
+  if (r.bmi < 18.5) return 'BMI 低于 18.5，优先把体重吃回来，再谈增肌或减脂。';
+  if (r.bmi < 24) return 'BMI 在正常范围（18.5–23.9）。BMI 不区分肌肉和脂肪，配合腰围一起看更准。';
+  if (r.bmi < 28) {
+    if (r.central) return 'BMI 属超重，且腰围已达中心性肥胖标准——内脏脂肪的风险比体重数字更值得优先处理。';
+    return 'BMI 偏高但腰围正常。如果你在规律力量训练，这多半是肌肉量带来的，不必按“超重”处理。';
+  }
+  return 'BMI ≥28 属肥胖（中国标准），建议先减重；本工具已按理想体重折算蛋白与脂肪，不需要再额外加蛋白。';
+}
+
 /* 阶段建议：参照国内健身圈通行的 BMI 切换点 */
 function bmiNote(r) {
   const bmi = r.bmi;
+  const waistWarn = r.central ? '另外腰围已达中心性肥胖标准，内脏脂肪比体重更该优先处理。' : '';
   if (r.scene.key === 'cut') {
-    if (bmi <= (state.sex === 'm' ? 22 : 20)) return `BMI ${bmi}，已经到了建议的减脂终点（男 22–23 / 女 20–21）。再往下减，掉的更多是肌肉而不是脂肪，建议转增肌。`;
-    if (bmi <= 24) return `BMI ${bmi}，处在正常范围。可以继续减，但注意别追低体脂——腹肌这类目标对多数人性价比很低。`;
-    return `BMI ${bmi}，先减到 24 以下再考虑增肌，收益会比现在直接增肌更大。`;
+    if (bmi < 18.5) return `BMI ${bmi}，已经偏瘦。继续减会掉肌肉和月经/激素水平，建议先回到 18.5 以上。`;
+    if (bmi <= (state.sex === 'm' ? 22 : 20)) return `BMI ${bmi}，到了建议的减脂终点（男 22–23 / 女 20–21）。再减多半是肌肉，建议转增肌。`;
+    if (bmi < 24) return `BMI ${bmi}，在正常范围（中国标准 18.5–23.9）。可以继续减，但别追低体脂。${waistWarn}`;
+    if (bmi < 28) return `BMI ${bmi}，属超重（24–27.9）。继续按当前缺口减，不用更激进。${waistWarn}`;
+    return `BMI ${bmi}，属肥胖（≥28）。先把体重降到 24 以下收益最大；蛋白已按理想体重折算，不需要吃更多。${waistWarn}`;
   }
   if (r.scene.key === 'bulk') {
-    if (bmi >= 25) return `BMI ${bmi}，已经偏高。增肌期建议控制在 BMI 24–25 以内，否则多出来的重量主要是脂肪。`;
-    if (bmi >= 23) return `BMI ${bmi}，接近增肌的上限区间（男 23–24 / 女 21–22）。建议按每月 0.5–1 kg 的速度收着增。`;
-    return `BMI ${bmi}，还有增重空间。控制在每月 +0.5–1 kg，别追求快速涨秤。`;
+    if (bmi >= 28) return `BMI ${bmi} 已达肥胖，不建议继续增肌。先减脂，增肌的效率在低体脂下反而更高。`;
+    if (bmi >= 25) return `BMI ${bmi} 已超重，增肌期建议控制在 24–25 以内，否则多出来的重量主要是脂肪。`;
+    if (bmi >= 23) return `BMI ${bmi} 接近增肌上限（男 23–24 / 女 21–22），按每月 +0.5–1 kg 收着增。`;
+    return `BMI ${bmi}，还有增重空间。控制每月 +0.5–1 kg，别追求快速涨秤。`;
   }
   return '';
 }
@@ -437,6 +506,8 @@ function renderResult() {
     ${r.useIbw ? `<div class="pill-note" style="background:rgba(10,132,255,.08);border-color:rgba(10,132,255,.25);color:#9ccbff">
       <span class="i">📐</span><span>BMI ${r.bmi}，蛋白与脂肪按<b>理想体重 ${r.refW} kg</b> 折算（国内临床对肥胖人群的通行做法），而不是实际体重 ${state.weight} kg。</span></div>` : ''}
   </div>
+
+  ${bmiCard(r)}
 
   <div class="card">
     <div class="card-title"><h3>把数字落到每顿饭</h3><span class="card-hint">${state.meals} 餐 / 天</span></div>
@@ -2046,6 +2117,12 @@ function openEvidence(ids) {
       · <b>《中国居民膳食指南（2022）》</b>：蔬菜 300–500 g、水果 200–350 g、全谷物 50–150 g、大豆坚果 25–35 g 等份量建议。<br><br>
       <b>关于「2026 版」</b>：截至 2026 年初，中国营养学会仍在为下一版指南公开征集修订意见，新版尚未发布。网上流传的「2026 新膳食指南」多为自媒体解读或预测，所以本工具仍以 2022 版为准，等官方发布后再更新。</p></div>
 
+    <div class="sec"><h4>⑧ BMI 与腰围用的是哪套标准</h4>
+      <p>BMI = 体重 ÷ 身高²，分级用<b>中国标准</b>（WS/T 428-2013 与《肥胖症中国诊疗指南（2024 年版）》）：<b>&lt;18.5 偏瘦 · 18.5–23.9 正常 · 24–27.9 超重 · ≥28 肥胖</b>。注意这套切点比 WHO 国际标准（25/30）更严格，因为亚洲人在同样 BMI 下体脂和糖尿病风险更高。<br><br>
+      中心性肥胖按 <b>男性腰围 ≥90 cm、女性 ≥85 cm</b>（2024 指南）；腰高比（腰围÷身高）<b>≥0.5</b> 视为风险增高，这是 NICE NG246 推荐的低成本筛查指标。<br><br>
+      BMI 本身不区分肌肉和脂肪，所以本工具不会只凭 BMI 下结论：如果你在规律力量训练、BMI 24–28 但腰围正常，提示里会明确说「多半是肌肉量，不必按超重处理」。</p>
+      <a class="ref" href="https://www.chinagp.net/" target="_blank" rel="noopener">参考：肥胖症中国诊疗指南（2024 年版）↗</a></div>
+
     <div class="sec"><h4>⑨ 与国内「健身 Excel 套表」类方案的差异</h4>
       <p>国内流行的表格方案（例如 B 站好人松松的套表）用的是「BMR ÷ 0.7 + 训练固定消耗 + 有氧」的分解法，减脂热量取平衡热量的 <b>0.64 倍</b>（20% 缺口 × 0.8 容错余量）。我们吸收了其中两点：<b>训练日 / 休息日分开算</b>、<b>有氧单列</b>。<br><br>
       没有照搬的三点：<br>
@@ -2450,7 +2527,10 @@ document.addEventListener('input', (ev) => {
   const p = (v - s.min) / (s.max - s.min) * 100;
   s.style.setProperty('--p', p + '%');
   const lab = $('#fv-' + id);
-  if (lab) lab.innerHTML = `${v}<small>${lab.querySelector('small')?.textContent || ''}</small>`;
+  if (lab) {
+    if (id === 'waist') lab.innerHTML = v > 0 ? `${v}<small>cm</small>` : '<span style="font-size:13px;color:var(--dim-2)">未填</span>';
+    else lab.innerHTML = `${v}<small>${lab.querySelector('small')?.textContent || ''}</small>`;
+  }
   save();
 });
 

@@ -1,4 +1,4 @@
-const VERSION = 'v2026.11.04 · af6001ca';
+const VERSION = 'v2026.11.04 · 8e569768';
 const CACHE = 'mc-' + VERSION;
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
