@@ -7,8 +7,13 @@
 ## 本地修改流程（改完 push 即自动上线）
 
 ```bash
-python3 build.py          # 把 src/ 打包成 index.html
-open index.html           # 本地预览
+./deploy.sh               # 一键：打包 + 提交 + 推送
+```
+
+等价于：
+
+```bash
+python3 build.py
 git add -A && git commit -m "update" && git push
 ```
 
