@@ -22,16 +22,13 @@ def _git(*args):
     except Exception:
         return ""
 
-# 版本号跟随后一次提交，而不是构建时间：
-# 同一份源码重复构建得到同一个版本号，方便核对线上是否最新
-commit = _git("log", "-1", "--format=%h")
-cdate = _git("log", "-1", "--format=%cd", "--date=format:%Y.%m.%d")
-dirty = bool(_git("status", "--porcelain", "--", "src"))
-if commit:
-    VERSION = f"v{cdate} · {commit}" + (" · 未提交" if dirty else "")
-else:
-    VERSION = "v" + datetime.datetime.now().strftime("%Y.%m.%d %H:%M")
-digest = hashlib.sha1(out.encode("utf-8")).hexdigest()[:8]
+# 版本号 = 源码内容哈希 + 最后一次改动源码的提交日期。
+# 好处：同一份源码重复构建结果完全一致，只有真正改了 src/ 才会变。
+src_digest = hashlib.sha1((css + data + app + template).encode("utf-8")).hexdigest()[:8]
+cdate = _git("log", "-1", "--format=%cd", "--date=format:%Y.%m.%d", "--", "src")
+if not cdate:
+    cdate = datetime.datetime.now().strftime("%Y.%m.%d")
+VERSION = f"v{cdate} · {src_digest}"
 out = out.replace("__BUILD__", VERSION)
 
 target = ROOT / "index.html"
