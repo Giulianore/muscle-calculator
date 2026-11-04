@@ -483,6 +483,52 @@ Object.assign(ICONS, {
   dragonfruit: S(P.round('#e84a7a'))
 });
 
+
+/* 零食插画 */
+P.cookie = (fill = '#d9a05b', chip = '#6b4423') => `
+  <ellipse cx="60" cy="104" rx="26" ry="5" fill="#000" opacity=".2"/>
+  <circle cx="60" cy="62" r="34" fill="${fill}" ${OUT}/>
+  <circle cx="48" cy="50" r="5" fill="${chip}"/><circle cx="72" cy="58" r="5" fill="${chip}"/>
+  <circle cx="56" cy="76" r="4.5" fill="${chip}"/><circle cx="74" cy="78" r="4" fill="${chip}"/>
+  <circle cx="40" cy="70" r="3.5" fill="${chip}"/>`;
+P.cake = (cream = '#ffd9e0', body = '#e8c07a', top = '#e8424a') => `
+  <ellipse cx="60" cy="104" rx="28" ry="5" fill="#000" opacity=".2"/>
+  <path d="M28 52h64v40c0 6-6 10-14 10H42c-8 0-14-4-14-10V52Z" fill="${body}" ${OUT}/>
+  <path d="M28 52h64v12c0 6-14 10-32 10S28 70 28 64V52Z" fill="${cream}" ${OUT}/>
+  <circle cx="60" cy="40" r="8" fill="${top}" ${OUT}/>
+  <path d="M44 78h32M48 88h24" stroke="#c9a05e" stroke-width="4" stroke-linecap="round"/>`;
+P.chocolate = (fill = '#5a3a2a', wrap = '#c9a05e') => `
+  <ellipse cx="60" cy="104" rx="28" ry="5" fill="#000" opacity=".2"/>
+  <path d="M30 44h60v44H30z" fill="${fill}" ${OUT}/>
+  <path d="M50 44v44M70 44v44M30 66h60" stroke="#3a2418" stroke-width="3"/>
+  <path d="M30 44h60v10H30z" fill="${wrap}" ${OUT}/>
+  <path d="M36 58h8M56 58h8M76 58h8" stroke="#7a5438" stroke-width="3" stroke-linecap="round" opacity=".7"/>`;
+P.chips = (bag = '#e8424a', chip = '#ffd166') => `
+  <ellipse cx="60" cy="104" rx="22" ry="5" fill="#000" opacity=".2"/>
+  <path d="M40 26h40l6 66H34l6-66Z" fill="${bag}" ${OUT}/>
+  <path d="M34 34h52" stroke="#ffffff" stroke-width="4" opacity=".35"/>
+  <ellipse cx="52" cy="62" rx="10" ry="7" fill="${chip}" transform="rotate(-18 52 62)"/>
+  <ellipse cx="70" cy="76" rx="10" ry="7" fill="${chip}" transform="rotate(12 70 76)"/>
+  <path d="M46 46c4-4 10-5 14-2" stroke="#ffffff" stroke-width="3" opacity=".5" fill="none"/>`;
+P.icecream = (scoop = '#ffd9e0', cone = '#e8c07a') => `
+  <ellipse cx="60" cy="104" rx="20" ry="5" fill="#000" opacity=".2"/>
+  <path d="M40 44h40l-20 48-20-48Z" fill="${cone}" ${OUT}/>
+  <path d="M46 54l14 32M74 54L60 86" stroke="#c9a05e" stroke-width="3" opacity=".8"/>
+  <circle cx="60" cy="36" r="18" fill="${scoop}" ${OUT}/>
+  <path d="M50 30c4-4 10-5 14-2" stroke="#ffffff" stroke-width="4" opacity=".6" fill="none" stroke-linecap="round"/>`;
+
+Object.assign(ICONS, {
+  cookie: S(P.cookie()),
+  cake: S(P.cake()),
+  chocolate: S(P.chocolate()),
+  darkchoc: S(P.chocolate('#2f1c12')),
+  chips: S(P.chips()),
+  icecream: S(P.icecream()),
+  nut: S(P.nut('#b8864b')),
+  soda: S(P.cup('#c8503a')),
+  tea: S(P.cup('#c9a06e'))
+});
+
 /* ---------- 食物库 ---------- */
 /* 数值为每 100 g 可食部（熟食按熟重、生食按生重），参考《中国食物成分表》第 6 版与 USDA */
 const FOODS = [
@@ -1104,6 +1150,187 @@ const FOODS = [
     why: '籽提供不溶性纤维，对便秘明显；但糖不算低，一次半个足够。',
     ev: ['dietary'],
     macro: ['膳食纤维 1.6 g（含籽）', '花青素（红心）', '镁']
+  },
+
+  /* ---------- 新增原食材 ---------- */
+  {
+    id: 'millet', cat: 'carb', name: '小米', state: '煮熟', icon: 'oats',
+    kcal: 121, p: 3.5, c: 25.0, f: 1.2, fiber: 0.7,
+    unit: { name: '一小碗', g: 150 }, tag: '养胃',
+    tip: '和米饭轮着吃，别只喝小米粥（粥的碳水密度低，容易喝多）。',
+    why: '含 B 族维生素和色氨酸，口感软，肠胃敏感时的替代主食。',
+    ev: ['dietary']
+  },
+  {
+    id: 'taro', cat: 'carb', name: '芋头', state: '蒸', icon: 'potato',
+    kcal: 56, p: 2.2, c: 12.7, f: 0.2, fiber: 1.0,
+    unit: { name: '一个', g: 150 }, tag: '低热量',
+    tip: '蒸着吃或炖汤，别做芋泥加糖加油；它算主食不算菜。',
+    why: '碳水 12.7 g/100 g 但热量只有 56 kcal，体积大、饱腹强。',
+    ev: ['dietary']
+  },
+  {
+    id: 'duckbreast', cat: 'protein', name: '鸭胸', state: '去皮生重', icon: 'chickenleg',
+    kcal: 130, p: 19.5, c: 0, f: 5.0, fiber: 0,
+    unit: { name: '一块', g: 120 }, tag: '换口味',
+    tip: '去皮煎或烤，别做酱鸭、烤鸭（糖和油都高）。',
+    why: '蛋白 19.5 g 且富含铁，鸡胸吃腻了可以轮换。',
+    ev: ['morton']
+  },
+  {
+    id: 'liver', cat: 'protein', name: '猪肝', state: '生重', icon: 'beef',
+    kcal: 129, p: 19.3, c: 5.0, f: 3.5, fiber: 0,
+    unit: { name: '一小份', g: 80 }, tag: '补铁·维A',
+    tip: '每周 1 次、每次 50–80 g 就够；爆炒前焯水去腥，别过量。',
+    why: '铁和维生素 A 含量极高，但维 A 过量有风险，控制频率。',
+    ev: ['dietary'],
+    macro: ['血红素铁：吸收率高于植物铁', '维生素 A：视力与免疫', '维生素 B12']
+  },
+  {
+    id: 'scallop', cat: 'protein', name: '扇贝', state: '生重', icon: 'clam',
+    kcal: 60, p: 11.1, c: 2.6, f: 0.6, fiber: 0,
+    unit: { name: '6 个', g: 100 }, tag: '高蛋白低脂',
+    tip: '蒜蓉粉丝蒸会把油和粉丝都吃进去，清蒸更划算。',
+    why: '蛋白 11 g、脂肪不到 1 g，贝类里最容易买到的一种。',
+    ev: ['helms']
+  },
+  {
+    id: 'eggwhite', cat: 'protein', name: '蛋清', state: '生重', icon: 'egg',
+    kcal: 48, p: 11.6, c: 1.1, f: 0.1, fiber: 0,
+    unit: { name: '3 个蛋的蛋清', g: 100 }, tag: '纯蛋白',
+    tip: '做蛋清羹或炒蛋清，蛋黄别扔——一天 1–2 个全蛋没问题。',
+    why: '几乎纯蛋白，适合在热量很紧的时候补蛋白。',
+    ev: ['morton']
+  },
+  {
+    id: 'hazelnut', cat: 'fat', name: '榛子', state: '原味', icon: 'nut',
+    kcal: 628, p: 15.0, c: 17.0, f: 61.0, fiber: 9.7,
+    unit: { name: '一小把', g: 15 }, tag: '坚果',
+    tip: '原味带壳，别买糖炒或巧克力涂层。',
+    why: '单不饱和脂肪和维生素 E 含量高，是坚果里风味最足的之一。',
+    ev: ['dietary']
+  },
+  {
+    id: 'pinenut', cat: 'fat', name: '松子', state: '原味', icon: 'nut',
+    kcal: 698, p: 13.7, c: 13.0, f: 68.4, fiber: 3.7,
+    unit: { name: '一勺', g: 10 }, tag: '高热量',
+    tip: '撒在菜上提味即可，10 g 就 70 kcal，别当零食嗑。',
+    why: '脂肪密度最高的坚果之一，控量比选种类更重要。',
+    ev: ['dietary']
+  },
+  {
+    id: 'flaxoil', cat: 'fat', name: '亚麻籽油', state: '冷榨', icon: 'oliveoil',
+    kcal: 899, p: 0, c: 0, f: 99.9, fiber: 0,
+    unit: { name: '一瓷勺', g: 10 }, tag: 'Omega-3',
+    tip: '只能凉拌，别加热（烟点低，高温会破坏 ALA）。',
+    why: '植物性 α-亚麻酸最直接的来源，和橄榄油轮换用。',
+    ev: ['dietary']
+  },
+
+  /* ---------- 零食 ---------- */
+  {
+    id: 'sodacracker', cat: 'snack', name: '苏打饼干', state: '每 100 g', icon: 'cookie',
+    kcal: 408, p: 8.4, c: 76.0, f: 7.7, fiber: 2.1,
+    unit: { name: '4 片', g: 25 }, tag: '高碳水',
+    tip: '看着“清淡”，其实 4 片就 100 kcal，且几乎全是精制碳水。',
+    why: 'GI 高、饱腹差，最容易一包吃完——按片数拿，别拿着袋子吃。',
+    ev: ['dietary']
+  },
+  {
+    id: 'cookie', cat: 'snack', name: '曲奇饼干', state: '每 100 g', icon: 'cookie',
+    kcal: 546, p: 6.0, c: 65.0, f: 29.0, fiber: 1.8,
+    unit: { name: '3 块', g: 30 }, tag: '糖油混合',
+    tip: '黄油+糖的典型组合，3 块约 160 kcal，等于半碗饭。',
+    why: '脂肪 29%、碳水 65%，是“糖油混合物”的标准样本。',
+    ev: ['dietary']
+  },
+  {
+    id: 'digestive', cat: 'snack', name: '消化饼干', state: '每 100 g', icon: 'cookie',
+    kcal: 471, p: 7.0, c: 67.0, f: 20.0, fiber: 3.5,
+    unit: { name: '2 片', g: 30 }, tag: '名字误导',
+    tip: '“助消化”是营销词，热量并不低，2 片约 140 kcal。',
+    why: '纤维略高于普通饼干，但脂肪仍有 20%，不能当健康食品。',
+    ev: ['dietary']
+  },
+  {
+    id: 'spongecake', cat: 'snack', name: '蛋糕（海绵）', state: '每 100 g', icon: 'cake',
+    kcal: 347, p: 7.0, c: 55.0, f: 12.0, fiber: 1.0,
+    unit: { name: '一块', g: 80 }, tag: '高糖',
+    tip: '一块 80 g 约 280 kcal；奶油蛋糕再翻一倍。',
+    why: '糖占比高、蛋白低，血糖冲得快，饿得也快。',
+    ev: ['dietary']
+  },
+  {
+    id: 'cheesecake', cat: 'snack', name: '芝士蛋糕', state: '每 100 g', icon: 'cake',
+    kcal: 321, p: 6.0, c: 25.0, f: 22.0, fiber: 0.4,
+    unit: { name: '一块', g: 100 }, tag: '高脂',
+    tip: '一块 100 g 约 320 kcal，脂肪比蛋白还多。',
+    why: '奶油奶酪带来大量饱和脂肪，偶尔吃、按块计量。',
+    ev: ['dietary']
+  },
+  {
+    id: 'dark70', cat: 'snack', name: '黑巧克力 70%', state: '每 100 g', icon: 'darkchoc',
+    kcal: 598, p: 7.8, c: 45.9, f: 42.6, fiber: 10.9,
+    unit: { name: '2 小块', g: 20 }, tag: '高可可',
+    tip: '20 g 约 120 kcal；可可含量越高，糖越少、苦味越重。',
+    why: '70% 可可的多酚含量高，但脂肪仍有 42%，属于“高热量健康食物”。',
+    ev: ['dietary']
+  },
+  {
+    id: 'dark85', cat: 'snack', name: '黑巧克力 85%', state: '每 100 g', icon: 'darkchoc',
+    kcal: 592, p: 9.7, c: 34.0, f: 46.0, fiber: 11.0,
+    unit: { name: '2 小块', g: 20 }, tag: '低糖',
+    tip: '同重量下糖比 70% 少 1/4，但脂肪更高，别因此多吃。',
+    why: '糖低、可可高，适合控糖又想吃甜的人，仍要限量。',
+    ev: ['dietary']
+  },
+  {
+    id: 'milkchoc', cat: 'snack', name: '牛奶巧克力', state: '每 100 g', icon: 'chocolate',
+    kcal: 535, p: 7.6, c: 59.0, f: 30.0, fiber: 3.4,
+    unit: { name: '一排', g: 30 }, tag: '高糖',
+    tip: '糖接近 60%，一条 30 g 约 160 kcal，是“糖+脂肪”双高。',
+    why: '与黑巧相比糖多、可可少，控糖期尽量选 70% 以上。',
+    ev: ['dietary']
+  },
+  {
+    id: 'whitechoc', cat: 'snack', name: '白巧克力', state: '每 100 g', icon: 'chocolate',
+    kcal: 539, p: 5.9, c: 59.0, f: 32.0, fiber: 0,
+    unit: { name: '2 块', g: 20 }, tag: '无可可',
+    tip: '白巧不含可可固形物，本质是可可脂+糖，营养价值最低。',
+    why: '几乎没有多酚，糖脂比最高的一类巧克力。',
+    ev: ['dietary']
+  },
+  {
+    id: 'chips', cat: 'snack', name: '薯片', state: '每 100 g', icon: 'chips',
+    kcal: 536, p: 7.0, c: 53.0, f: 34.0, fiber: 4.4,
+    unit: { name: '一小袋', g: 40 }, tag: '油炸',
+    tip: '一小袋 40 g 约 215 kcal，且几乎没有饱腹感。',
+    why: '油炸+精制淀粉+盐，是最容易过量的一类零食。',
+    ev: ['cooking']
+  },
+  {
+    id: 'icecream', cat: 'snack', name: '冰淇淋', state: '每 100 g', icon: 'icecream',
+    kcal: 207, p: 3.5, c: 24.0, f: 11.0, fiber: 0.5,
+    unit: { name: '一个球', g: 60 }, tag: '糖脂',
+    tip: '一个球约 124 kcal；甜筒的脆皮再加 60–80 kcal。',
+    why: '糖和饱和脂肪都不低，但单份热量可控，偶尔吃不必内疚。',
+    ev: ['dietary']
+  },
+  {
+    id: 'milktea', cat: 'snack', name: '奶茶（全糖）', state: '每 100 ml', icon: 'tea',
+    kcal: 60, p: 0.6, c: 11.0, f: 1.8, fiber: 0,
+    unit: { name: '一杯', g: 500 }, tag: '液体热量',
+    tip: '一杯 500 ml 全糖奶茶 ≈ 300 kcal、55 g 糖；选三分糖能砍掉一半。',
+    why: '液体热量最不占肚子，是“明明没吃多少却胖了”的常见原因。',
+    ev: ['dietary']
+  },
+  {
+    id: 'cola', cat: 'snack', name: '可乐', state: '每 100 ml', icon: 'soda',
+    kcal: 43, p: 0, c: 10.6, f: 0, fiber: 0,
+    unit: { name: '一罐', g: 330 }, tag: '纯糖',
+    tip: '一罐 330 ml 约 35 g 糖，等于 7 块方糖。',
+    why: '纯添加糖、零营养，是膳食指南明确建议限制的一类。',
+    ev: ['dietary']
   }
 ];
 
@@ -1229,6 +1456,35 @@ function mealSequence(trainTime, meals) {
   }
   return seq;
 }
+
+
+/* ---------- 常见外食菜品（按「一份」估算，仅作参考） ---------- */
+const DISHES = [
+  { id: 'hongshaorou', name: '红烧肉', portion: '一份 150 g', kcal: 600, p: 15, c: 8, f: 56, note: '五花肉+糖，脂肪最高的一类' },
+  { id: 'gongbaojiding', name: '宫保鸡丁', portion: '一份 200 g', kcal: 380, p: 22, c: 14, f: 26, note: '油和花生都不少' },
+  { id: 'yuxiangrousi', name: '鱼香肉丝', portion: '一份 200 g', kcal: 340, p: 16, c: 16, f: 24, note: '糖醋口，糖不低' },
+  { id: 'fanqiechaodan', name: '番茄炒蛋', portion: '一份 200 g', kcal: 260, p: 12, c: 9, f: 19, note: '家常做法要放两次油' },
+  { id: 'mapodoufu', name: '麻婆豆腐', portion: '一份 200 g', kcal: 300, p: 14, c: 10, f: 22, note: '豆腐吸油，油比看起来多' },
+  { id: 'qingzhengluyu', name: '清蒸鲈鱼', portion: '一条 200 g', kcal: 210, p: 30, c: 2, f: 9, note: '外食里少见的低油选择' },
+  { id: 'shuizhuniurou', name: '水煮牛肉', portion: '一份 250 g', kcal: 520, p: 28, c: 10, f: 40, note: '油在汤里，捞着吃能少一半' },
+  { id: 'ganbiandoujiao', name: '干煸豆角', portion: '一份 200 g', kcal: 290, p: 6, c: 12, f: 24, note: '多数店是油炸过的' },
+  { id: 'disanxian', name: '地三鲜', portion: '一份 250 g', kcal: 420, p: 6, c: 30, f: 30, note: '茄子土豆都过油' },
+  { id: 'tudousi', name: '酸辣土豆丝', portion: '一份 200 g', kcal: 190, p: 3, c: 24, f: 9, note: '它算主食，不算蔬菜' },
+  { id: 'qingjiaorousi', name: '青椒肉丝', portion: '一份 200 g', kcal: 300, p: 18, c: 8, f: 21, note: '相对均衡，注意油' },
+  { id: 'huiguorou', name: '回锅肉', portion: '一份 150 g', kcal: 480, p: 14, c: 8, f: 44, note: '五花肉+豆瓣酱，高脂' },
+  { id: 'tangculiji', name: '糖醋里脊', portion: '一份 200 g', kcal: 520, p: 18, c: 45, f: 28, note: '挂糊油炸+糖醋汁' },
+  { id: 'kelejichi', name: '可乐鸡翅', portion: '一份 200 g', kcal: 430, p: 22, c: 18, f: 29, note: '糖和鸡皮都在这' },
+  { id: 'niumian', name: '牛肉面', portion: '一碗 600 g', kcal: 650, p: 28, c: 85, f: 18, note: '汤里的油别全喝' },
+  { id: 'lanzhou', name: '兰州拉面', portion: '一碗 600 g', kcal: 550, p: 22, c: 80, f: 12, note: '面多肉少，蛋白偏低' },
+  { id: 'danchaofan', name: '蛋炒饭', portion: '一份 350 g', kcal: 620, p: 14, c: 80, f: 24, note: '一份油约 15 g' },
+  { id: 'jiaozi', name: '饺子（猪肉白菜）', portion: '10 个 250 g', kcal: 500, p: 20, c: 55, f: 22, note: '馅里的肥肉和油' },
+  { id: 'baozi', name: '包子（猪肉）', portion: '2 个 200 g', kcal: 460, p: 16, c: 60, f: 17, note: '面多、馅少' },
+  { id: 'malatang', name: '麻辣烫', portion: '一份 500 g（不含汤）', kcal: 480, p: 25, c: 40, f: 24, note: '不喝汤能省 100 kcal' },
+  { id: 'huangmenji', name: '黄焖鸡米饭', portion: '一份', kcal: 780, p: 32, c: 90, f: 30, note: '一份顶两顿，汤汁别拌饭' },
+  { id: 'zhaji', name: '炸鸡', portion: '2 块 200 g', kcal: 560, p: 30, c: 25, f: 38, note: '裹粉吸油，去皮能少 1/3' },
+  { id: 'hanbao', name: '汉堡（牛肉）', portion: '1 个', kcal: 520, p: 25, c: 42, f: 28, note: '酱料贡献不少脂肪' },
+  { id: 'pisa', name: '披萨', portion: '2 片', kcal: 480, p: 20, c: 50, f: 22, note: '芝士拉丝就是脂肪' }
+];
 
 /* ---------- 核心研究（用于「科学依据」页，链接优先国内可直连） ---------- */
 const STUDIES = [
@@ -1386,5 +1642,6 @@ const CATS = {
   carb: { label: '碳水', color: '#ffd60a', icon: '🍚' },
   protein: { label: '蛋白', color: '#ff6482', icon: '🍗' },
   fat: { label: '脂肪', color: '#64d2ff', icon: '🥑' },
-  veg: { label: '果蔬', color: '#3ddc84', icon: '🥦' }
+  veg: { label: '果蔬', color: '#3ddc84', icon: '🥦' },
+  snack: { label: '零食', color: '#ff9f0a', icon: '🍪' }
 };

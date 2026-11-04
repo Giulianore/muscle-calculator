@@ -25,6 +25,7 @@ const DEFAULTS = {
   proteinTier: 'std',          // std | high
   kcalOffset: 0,               // 根据反馈手动调节的热量
   logs: [],                    // 餐次记录（最多 90 条）
+  weights: [],                 // 体重记录（最多 400 条）
   days: {},                    // 每日汇总（保留 400 天）
   logView: 'today',            // today | calendar | history
   calMonth: null,              // 'YYYY-MM'
@@ -524,7 +525,7 @@ function renderFood() {
   <div style="margin:12px 0 10px">
     ${segHTML('foodCat', [
       { v: 'carb', t: '碳水' }, { v: 'protein', t: '蛋白' },
-      { v: 'fat', t: '脂肪' }, { v: 'veg', t: '果蔬' }
+      { v: 'fat', t: '脂肪' }, { v: 'veg', t: '果蔬' }, { v: 'snack', t: '零食' }
     ], state.foodCat)}
   </div>
   <div class="food-search">
@@ -533,6 +534,10 @@ function renderFood() {
     <span class="fs-count" id="foodCount">${list.length} 种</span>
   </div>
   ${state.foodCat === 'veg' ? `<div class="pill-note" style="margin:0 0 12px"><span class="i">🥬</span><span>目标：蔬菜 <b>300–500 g</b>、水果 <b>200–350 g</b>，每天至少 <b>3 种颜色</b>。深色蔬菜（菠菜、西兰花）占一半，水果尽量整吃而不是榨汁。</span></div>` : ''}
+  <button class="dish-entry" data-action="dishes">
+    <span>🍜 外食 / 菜品估算</span>
+    <span class="de-sub">${DISHES.length} 道常见菜，按「一份」算 →</span>
+  </button>
   <div class="food-list" id="foodList">
     ${list.map((f, i) => foodCardHTML(f, i)).join('')}
   </div>
@@ -738,13 +743,19 @@ function tuneInit() {
   const mid = (r.scene.rate[0] + r.scene.rate[1]) / 2;
   const t = state.tune;
   if (!t) {
-    const start = state.weight;
+    const wt = weightTrend();
     const weeks = 2;
-    state.tune = {
-      weeks, start,
-      now: Math.round((start * (1 + mid * weeks)) * 10) / 10,
-      strength: 'same', energy: 'ok'
-    };
+    // 有体重记录就用真实数据：两周前 vs 现在
+    if (wt.last && wt.w14 && wt.last.d >= dstr(addDays(new Date(), -14))) {
+      state.tune = { weeks, start: wt.w14, now: wt.last.kg, strength: 'same', energy: 'ok' };
+    } else {
+      const start = wt.last ? wt.last.kg : state.weight;
+      state.tune = {
+        weeks, start,
+        now: Math.round((start * (1 + mid * weeks)) * 10) / 10,
+        strength: 'same', energy: 'ok'
+      };
+    }
   }
   return state.tune;
 }
@@ -881,6 +892,172 @@ function openTune() {
   renderTuneSheet();
 }
 
+/* ---------------- 体重记录 ---------------- */
+function addWeight(date, kg) {
+  const i = state.weights.findIndex(w => w.d === date);
+  if (i >= 0) state.weights[i].kg = kg;
+  else state.weights.push({ d: date, kg });
+  state.weights.sort((a, b) => a.d.localeCompare(b.d));
+  if (state.weights.length > 400) state.weights = state.weights.slice(-400);
+  save();
+}
+
+function weightAt(daysAgo) {
+  const target = dstr(addDays(new Date(), -daysAgo));
+  const before = state.weights.filter(w => w.d <= target).pop();
+  return before ? before.kg : null;
+}
+
+function weightTrend() {
+  const last = state.weights[state.weights.length - 1] || null;
+  const w7 = weightAt(7), w14 = weightAt(14);
+  const series = state.weights.slice(-30);
+  return {
+    last, w7, w14,
+    d7: last && w7 ? round(last.kg - w7, 1) : null,
+    d14: last && w14 ? round(last.kg - w14, 1) : null,
+    series
+  };
+}
+
+function sparkline(series) {
+  if (series.length < 2) return '';
+  const vals = series.map(x => x.kg);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const span = max - min || 1;
+  const W = 300, H = 64, pad = 6;
+  const pts = series.map((x, i) => {
+    const px = pad + i * (W - pad * 2) / (series.length - 1);
+    const py = H - pad - (x.kg - min) / span * (H - pad * 2);
+    return `${px.toFixed(1)},${py.toFixed(1)}`;
+  }).join(' ');
+  const lastPt = pts.split(' ').pop();
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    <polyline points="${pts}" fill="none" stroke="url(#sparkGrad)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <defs><linearGradient id="sparkGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#ff9f0a"/><stop offset="100%" stop-color="#ff453a"/>
+    </linearGradient></defs>
+    <circle cx="${lastPt.split(',')[0]}" cy="${lastPt.split(',')[1]}" r="3.5" fill="#fff"/>
+  </svg>`;
+}
+
+function weightCard() {
+  const t = weightTrend();
+  if (!t.last) {
+    return `<div class="card">
+      <div class="card-title"><h3>体重</h3><span class="card-hint">建议每周同一天称</span></div>
+      <div class="empty-note">还没有体重记录。体重是判断「吃对没吃对」最直接的指标，比每天称更准的是看 7 天平均。</div>
+      <button class="btn-secondary" style="margin-top:12px" data-action="add-weight">＋ 记录体重</button>
+    </div>`;
+  }
+  const d7 = t.d7 === null ? '—' : `${t.d7 > 0 ? '+' : ''}${t.d7} kg`;
+  const d14 = t.d14 === null ? '—' : `${t.d14 > 0 ? '+' : ''}${t.d14} kg`;
+  return `<div class="card">
+    <div class="card-title"><h3>体重</h3><span class="card-hint">${t.last.d}</span></div>
+    <div class="weight-top">
+      <div class="weight-num">${t.last.kg}<small>kg</small></div>
+      <div class="weight-delta">
+        <span>7 天 ${d7}</span><span>14 天 ${d14}</span>
+      </div>
+    </div>
+    ${sparkline(t.series)}
+    <div class="btn-row" style="margin-top:12px">
+      <button class="btn-secondary" data-action="add-weight">记录体重</button>
+      <button class="btn-secondary" data-action="tune">看调整建议</button>
+    </div>
+  </div>`;
+}
+
+function openWeightSheet() {
+  const t = weightTrend();
+  const latest = t.last ? t.last.kg : state.weight;
+  sheetHTML(`
+    <h2>记录体重</h2>
+    <div class="sub">晨起空腹、排空后称最稳定；看 7 天平均，别被单日波动影响</div>
+    <label class="lf-date"><span>日期</span><input type="date" id="weightDate" value="${dstr()}" max="${dstr()}"></label>
+    <div class="field" style="margin-top:18px">
+      <div class="field-head">
+        <span class="field-label">体重</span>
+        <span class="field-value lv-wrap"><input class="lv-input" type="number" inputmode="decimal" id="weightKg" value="${latest}" step="0.1" min="30" max="250"><small>kg</small></span>
+      </div>
+    </div>
+    <button class="btn-primary" style="margin-top:18px" data-save-weight="1"><span class="shine"></span>保存</button>
+  `);
+}
+
+/* ---------------- 导出 / 导入 / 提醒 ---------------- */
+function exportData() {
+  const payload = {
+    app: 'muscle-calculator', version: 2, exported: new Date().toISOString(),
+    logs: state.logs, days: state.days, weights: state.weights,
+    settings: {
+      group: state.group, goal: state.goal, rest: state.rest, sex: state.sex,
+      height: state.height, weight: state.weight, age: state.age,
+      sessions: state.sessions, activity: state.activity, meals: state.meals,
+      proteinTier: state.proteinTier, kcalOffset: state.kcalOffset,
+      cardioH: state.cardioH, cardioInt: state.cardioInt, trainTime: state.trainTime
+    }
+  };
+  downloadFile(JSON.stringify(payload, null, 2), `muscle-calculator-${dstr()}.json`, 'application/json');
+}
+
+function importData(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const d = JSON.parse(reader.result);
+      if (!d || d.app !== 'muscle-calculator') throw new Error('不是本应用导出的文件');
+      if (Array.isArray(d.logs)) state.logs = d.logs.slice(0, 90);
+      if (d.days && typeof d.days === 'object') state.days = d.days;
+      if (Array.isArray(d.weights)) state.weights = d.weights.slice(-400);
+      if (d.settings) Object.assign(state, d.settings);
+      save(); closeSheet(); render({ top: true });
+      alert(`已导入：${state.logs.length} 条餐次、${Object.keys(state.days).length} 天汇总、${state.weights.length} 条体重`);
+    } catch (e) {
+      alert('导入失败：' + e.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function downloadFile(text, name, type) {
+  try {
+    const blob = new Blob([text], { type });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (e) {
+    // 某些环境没有 createObjectURL，退化成 data URI
+    const a = document.createElement('a');
+    a.href = 'data:' + type + ';charset=utf-8,' + encodeURIComponent(text);
+    a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+}
+
+/* 生成每日提醒日历（.ics），任何手机都能导入 */
+function downloadReminder() {
+  const now = new Date();
+  const stamp = now.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  const y = now.getFullYear(), m = pad2(now.getMonth() + 1), d = pad2(now.getDate());
+  const ics = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Muscle Calculator//CN', 'CALSCALE:GREGORIAN',
+    'BEGIN:VEVENT',
+    `UID:mc-reminder-${Date.now()}@local`,
+    `DTSTAMP:${stamp}`,
+    `DTSTART:${y}${m}${d}T200000`,
+    'DURATION:PT10M',
+    'RRULE:FREQ=DAILY',
+    'SUMMARY:记录今天的饮食',
+    'DESCRIPTION:打开 Muscle Calculator，花 30 秒记一餐。',
+    'BEGIN:VALARM', 'TRIGGER:-PT5M', 'ACTION:DISPLAY', 'DESCRIPTION:记录今天的饮食', 'END:VALARM',
+    'END:VEVENT', 'END:VCALENDAR'
+  ].join('\r\n');
+  downloadFile(ics, 'muscle-calculator-reminder.ics', 'text/calendar');
+}
+
 /* ---------------- 餐次记录 & 日历 ---------------- */
 const MEALS = [
   { v: 'breakfast', t: '早餐', icon: '🌅' },
@@ -1000,8 +1177,10 @@ function renderLogToday() {
     .map(([label, val, target, unit, color]) => {
       const pct = clamp(val / (target * 1.5) * 100, 0, 100);
       const diff = Math.round(val - target);
-      const verdict = val > target * 1.15 ? 'high' : val < target * 0.85 ? 'low' : 'ok';
-      const tag = verdict === 'ok' ? '达标' : verdict === 'high' ? `+${diff} ${unit}` : `${diff} ${unit}`;
+      const verdict = now.meals === 0 ? 'none' : val > target * 1.15 ? 'high' : val < target * 0.85 ? 'low' : 'ok';
+      const tag = verdict === 'ok' ? '达标'
+        : verdict === 'none' ? '未记录'
+        : verdict === 'high' ? `+${diff} ${unit}` : `${diff} ${unit}`;
       return `<div class="log-bar">
         <div class="lb-top">
           <span>${label}</span>
@@ -1023,6 +1202,8 @@ function renderLogToday() {
     <button class="btn-primary" style="margin-top:14px" data-action="add-meal"><span class="shine"></span>＋ 记录一餐</button>
   </div>
 
+  ${weightCard()}
+
   <div class="card">
     <div class="card-title"><h3>今天的记录</h3><span class="card-hint">${meals.length} 餐</span></div>
     ${meals.length ? meals.map(e => logRowHTML(e)).join('') : `<div class="empty-note">还没有记录。点上面的按钮，把今天这顿记下来。</div>`}
@@ -1041,6 +1222,7 @@ function logRowHTML(e) {
       <div class="lr-macros">碳 ${e.c} · 蛋 ${e.p} · 脂 ${e.f} g${e.oil ? ` · 含烹调油 ${e.oil} g` : ''}</div>
     </div>
     <div class="lr-kcal">${kcal}<small>kcal</small></div>
+    <button class="lr-again" data-again="${e.id}">再来一份</button>
     <button class="lr-del" data-del="${e.id}" aria-label="删除">✕</button>
   </div>`;
 }
@@ -1166,6 +1348,11 @@ function renderLogHistory() {
   const dates = Object.keys(byDate).sort().reverse();
 
   return `${logHeader('每一餐的记录', `最多保存 ${LOG_MAX} 条；日历状态不受清理影响。`)}
+  <div class="tool-row">
+    <button class="chip sm" data-action="export-data">⬇️ 导出备份</button>
+    <button class="chip sm" data-action="import-data">⬆️ 导入</button>
+    <button class="chip sm" data-action="reminder">⏰ 每日提醒</button>
+  </div>
   ${list.length ? dates.map(d => {
     const v = dayVerdict(d);
     const kcal = byDate[d].reduce((a, e) => a + e.c * 4 + e.p * 4 + e.f * 9, 0);
@@ -1286,6 +1473,26 @@ function openDaySheet(date) {
     <div class="status-chip ${v.status}" style="margin-bottom:14px">${st[0]}</div>
     ${body}
     <button class="btn-secondary" style="margin-top:16px" data-add-date="${date}">＋ 补记这一天的某一餐</button>
+  `);
+}
+
+/* ---------------- 外食菜品 ---------------- */
+function openDishes() {
+  const rows = DISHES.map(d => `<div class="dish-row">
+    <div class="dish-main">
+      <div class="dish-name">${d.name}<span class="dish-portion">${d.portion}</span></div>
+      <div class="dish-note">${d.note}</div>
+    </div>
+    <div class="dish-macros">
+      <b>${d.kcal}</b> kcal<br>
+      <span>碳 ${d.c} · 蛋 ${d.p} · 脂 ${d.f}</span>
+    </div>
+  </div>`).join('');
+  sheetHTML(`
+    <h2>外食菜品</h2>
+    <div class="sub">按「一份」估算，含做菜油；实际因店而异，仅供参考</div>
+    ${rows}
+    <div class="pill-note" style="margin-top:14px"><span class="i">💡</span><span>外食的油通常比家里多 50% 以上。点菜时优先选蒸、煮、白灼、清炒，重油菜用筷子在盘边刮一下。</span></div>
   `);
 }
 
@@ -1507,7 +1714,7 @@ function go(screen) {
 
 /* ---------------- 事件 ---------------- */
 document.addEventListener('click', (ev) => {
-  const t = ev.target.closest('[data-action],[data-seg],[data-tab],[data-food],[data-pick],[data-step],[data-veg-toggle],[data-add],[data-slider],[data-tstep],[data-apply-tune],[data-reset-tune],[data-edit],[data-del],[data-del-now],[data-save-entry],[data-add-date],[data-cal],[data-day],[data-method],[data-traintime],[data-swap]');
+  const t = ev.target.closest('[data-action],[data-seg],[data-tab],[data-food],[data-pick],[data-step],[data-veg-toggle],[data-add],[data-slider],[data-tstep],[data-apply-tune],[data-reset-tune],[data-edit],[data-del],[data-del-now],[data-save-entry],[data-add-date],[data-cal],[data-day],[data-method],[data-traintime],[data-swap],[data-save-weight],[data-again]');
   if (!t) return;
 
   /* 底部导航 */
@@ -1569,6 +1776,18 @@ document.addEventListener('click', (ev) => {
   if (t.dataset.delNow) {
     removeEntry(t.dataset.delNow); closeSheet(); render(); return;
   }
+  if (t.dataset.saveWeight) {
+    const kg = parseFloat($('#weightKg').value);
+    const dt = $('#weightDate').value || dstr();
+    if (kg >= 30 && kg <= 250) { addWeight(dt, Math.round(kg * 10) / 10); closeSheet(); render(); }
+    return;
+  }
+  if (t.dataset.again) {
+    const e = state.logs.find(x => x.id === t.dataset.again);
+    if (!e) return;
+    openEntry({ date: dstr(), meal: e.meal, c: e.c, p: e.p, f: Math.max(0, e.f - (e.oil || 0)), oil: e.oil || 0 });
+    return;
+  }
   if (t.dataset.saveEntry) {
     const d = state.draft;
     if (!d) return;
@@ -1620,6 +1839,11 @@ document.addEventListener('click', (ev) => {
   if (t.dataset.action === 'calc') { go('result'); return; }
   if (t.dataset.action === 'tune') { openTune(); return; }
   if (t.dataset.action === 'science') { openScience(); return; }
+  if (t.dataset.action === 'add-weight') { openWeightSheet(); return; }
+  if (t.dataset.action === 'export-data') { exportData(); return; }
+  if (t.dataset.action === 'import-data') { importFile(); return; }
+  if (t.dataset.action === 'reminder') { downloadReminder(); return; }
+  if (t.dataset.action === 'dishes') { openDishes(); return; }
   if (t.dataset.action === 'add-meal') { openEntry(null); return; }
   if (t.dataset.action === 'goto-food') { go('food'); return; }
   if (t.dataset.action === 'goto-meal') { go('meal'); return; }
@@ -1790,6 +2014,14 @@ document.addEventListener('change', (ev) => {
 
 $('#sheetMask').addEventListener('click', closeSheet);
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
+
+function importFile() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'application/json,.json';
+  input.onchange = () => { if (input.files[0]) importData(input.files[0]); };
+  input.click();
+}
 
 /* 启动 */
 if (state.screen === 'meal') ensureMeal();
