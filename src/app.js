@@ -17,6 +17,8 @@ const DEFAULTS = {
   age: 27,
   sessions: 4,
   trainTime: 'evening_after',
+  cart: [],                    // 购物车 [{cat,id,g,method,serv}]
+  cartSlot: 'lunch',           // 结算时选哪一餐
   cardioH: 0,                  // 每周有氧小时
   cardioInt: 'mid',            // low | mid | high
   exp: 'inter',         // novice | inter | adv
@@ -34,6 +36,7 @@ const DEFAULTS = {
   tune: null,
   foodCat: 'carb',
   foodQuery: '',
+  foodDraft: null,
   meal: {
     carb: { id: 'rice', g: 0, method: 'boil' },
     protein: { id: 'chicken', g: 0, method: 'light' },
@@ -507,10 +510,18 @@ function foodCardHTML(f, i) {
 }
 
 function updateFoodList() {
-  const list = foodFiltered();
   const box = $('#foodList');
-  if (box) box.innerHTML = list.map((f, i) => foodCardHTML(f, i)).join('') || `<div class="empty-note">没有找到「${state.foodQuery}」，换个关键词试试。</div>`;
   const cnt = $('#foodCount');
+  if (!box) return;
+  if (state.foodCat === 'dish') {
+    const q = (state.foodQuery || '').trim();
+    const list = DISHES.filter(d => !q || (d.name + d.note).includes(q));
+    box.innerHTML = list.map((d, i) => dishCardHTML(d, i)).join('') || `<div class="empty-note">没有找到「${q}」。</div>`;
+    if (cnt) cnt.textContent = `${list.length} 道`;
+    return;
+  }
+  const list = foodFiltered();
+  box.innerHTML = list.map((f, i) => foodCardHTML(f, i)).join('') || `<div class="empty-note">没有找到「${state.foodQuery}」，换个关键词试试。</div>`;
   if (cnt) cnt.textContent = `${list.length} 种`;
 }
 
@@ -1476,6 +1487,269 @@ function openDaySheet(date) {
   `);
 }
 
+/* ---------------- 选购（购物车） ---------------- */
+const MEAL_SLOTS = [
+  { id: 'breakfast', name: '早餐', share: 0.25 },
+  { id: 'lunch', name: '午餐', share: 0.30 },
+  { id: 'dinner', name: '晚餐', share: 0.30 },
+  { id: 'snack', name: '加餐', share: 0.15 },
+  { id: 'pre', name: '练前', share: 0.20 },
+  { id: 'post', name: '练后', share: 0.32 }
+];
+
+function slotFoodById(id) { return FOODS.find(x => x.id === id); }
+
+function cartCount() { return state.cart.length; }
+
+/* 加入购物车时的小飞点动画 */
+function flyToCart(fromEl) {
+  const fab = document.querySelector('.cart-fab');
+  if (!fab || !fromEl || typeof fromEl.getBoundingClientRect !== 'function') return;
+  const a = fromEl.getBoundingClientRect(), b = fab.getBoundingClientRect();
+  if (!a.width || !b.width) return;
+  const dot = document.createElement('div');
+  dot.className = 'fly-dot';
+  dot.style.left = a.left + a.width / 2 + 'px';
+  dot.style.top = a.top + a.height / 2 + 'px';
+  document.body.appendChild(dot);
+  requestAnimationFrame(() => {
+    dot.style.transform = `translate(${b.left + b.width / 2 - (a.left + a.width / 2)}px, ${b.top + b.height / 2 - (a.top + a.height / 2)}px) scale(.4)`;
+    dot.style.opacity = '0';
+  });
+  setTimeout(() => dot.remove(), 520);
+}
+
+/* 购物车 → 自动记为这一餐 */
+function saveCartAsMeal() {
+  if (!state.cart.length) return;
+  const t = cartTotals();
+  const slot = MEAL_SLOTS.find(x => x.id === state.cartSlot) || MEAL_SLOTS[1];
+  saveEntry({
+    date: dstr(), meal: slot.id === 'pre' || slot.id === 'post' ? 'snack' : slot.id,
+    c: Math.round(t.c), p: Math.round(t.p), f: Math.round(t.f), oil: Math.round(t.oil)
+  });
+  state.cart = [];
+  save();
+  go('log');
+}
+
+function cartTotals() {
+  const t = { kcal: 0, p: 0, c: 0, f: 0, oil: 0 };
+  state.cart.forEach(it => {
+    if (it.dish) {
+      const d = DISHES.find(x => x.id === it.id);
+      if (!d) return;
+      t.kcal += d.kcal * it.serv; t.p += d.p * it.serv; t.c += d.c * it.serv; t.f += d.f * it.serv;
+    } else {
+      const f = FOODS.find(x => x.id === it.id);
+      if (!f) return;
+      const k = (it.g || 0) / 100;
+      const oil = oilGrams(f, it.method || 'raw', it.g || 0);
+      t.kcal += f.kcal * k + oil * 9; t.p += f.p * k; t.c += f.c * k; t.f += f.f * k + oil; t.oil += oil;
+    }
+  });
+  return t;
+}
+
+function addToCart(id, opts = {}) {
+  if (id.startsWith('dish:')) {
+    const did = id.slice(5);
+    const ex = state.cart.find(c => c.dish && c.id === did);
+    if (ex) ex.serv = Math.min(3, round(ex.serv + (opts.serv || 1), 1));
+    else state.cart.push({ dish: true, id: did, serv: opts.serv || 1 });
+  } else {
+    const f = FOODS.find(x => x.id === id);
+    if (!f) return;
+    const method = opts.method || methodsFor(f)[0];
+    const g = opts.g || 100;
+    const ex = state.cart.find(c => !c.dish && c.id === id && c.method === method);
+    if (ex) ex.g = Math.min(1500, ex.g + g);
+    else state.cart.push({ id, g, method });
+  }
+  save();
+}
+
+function cartTargetFor(slotId) {
+  const r = compute();
+  const slot = MEAL_SLOTS.find(x => x.id === slotId) || MEAL_SLOTS[1];
+  return { kcal: r.kcal * slot.share, p: r.p * slot.share, c: r.c * slot.share, f: r.f * slot.share, slot };
+}
+
+/* 食物卡片（带加入按钮） */
+function foodCardHTML(f, i) {
+  const gi = giOf(f);
+  const inCart = state.cart.filter(c => !c.dish && c.id === f.id).length;
+  return `<div class="food" data-food="${f.id}" style="animation-delay:${Math.min(i, 12) * 25}ms">
+    <div class="thumb">${ICONS[f.icon]}</div>
+    <div class="info">
+      <div class="nm">${f.name}<span class="tag">${f.tag}</span>${gi ? `<span class="gi ${gi.level}">GI ${gi.level}</span>` : ''}</div>
+      <div class="macros">
+        <span>碳水 <b>${f.c}</b></span><span>蛋白 <b>${f.p}</b></span><span>脂肪 <b>${f.f}</b></span>
+        <span>${f.kcal} kcal</span>
+      </div>
+      <div class="tip">${f.tip}</div>
+    </div>
+    <button class="add-btn ${inCart ? 'in' : ''}" data-addcart="${f.id}" aria-label="加入购物车">${inCart ? '✓' : '＋'}</button>
+  </div>`;
+}
+
+function dishCardHTML(d, i) {
+  const inCart = state.cart.some(c => c.dish && c.id === d.id);
+  return `<div class="food" data-dish="${d.id}" style="animation-delay:${Math.min(i, 12) * 25}ms">
+    <div class="thumb dish-thumb">🍽</div>
+    <div class="info">
+      <div class="nm">${d.name}<span class="tag">${d.portion}</span></div>
+      <div class="macros">
+        <span>碳水 <b>${d.c}</b></span><span>蛋白 <b>${d.p}</b></span><span>脂肪 <b>${d.f}</b></span>
+        <span>${d.kcal} kcal</span>
+      </div>
+      <div class="tip">${d.note}</div>
+    </div>
+    <button class="add-btn ${inCart ? 'in' : ''}" data-addcart="dish:${d.id}" aria-label="加入购物车">${inCart ? '✓' : '＋'}</button>
+  </div>`;
+}
+
+function cartFab() {
+  const n = cartCount();
+  const t = cartTotals();
+  if (!n) return '';
+  return `<div class="cart-bar">
+    <div class="cb-left">
+      <span class="cb-count">${n}</span>
+      <span class="cb-kcal">${Math.round(t.kcal)} kcal · 蛋 ${Math.round(t.p)} g</span>
+    </div>
+    <button class="cb-go" data-action="cart">去结算 →</button>
+  </div>`;
+}
+
+/* ---------------- 页面：选购 ---------------- */
+function renderShop() {
+  const list = foodFiltered();
+  const isDish = state.foodCat === 'dish';
+  return `
+  <div class="hero" style="padding-bottom:6px">
+    <div class="kicker"><span class="dot"></span> 边挑边算</div>
+    <h1 style="font-size:29px">选食材，<br>加进这一餐。</h1>
+    <p>点「＋」加入购物车，可以选做法；挑完到购物车结算，会自动记进今天。</p>
+  </div>
+  <div style="margin:12px 0 10px">
+    ${segHTML('foodCat', [
+      { v: 'carb', t: '碳水' }, { v: 'protein', t: '蛋白' }, { v: 'fat', t: '脂肪' },
+      { v: 'veg', t: '果蔬' }, { v: 'snack', t: '零食' }, { v: 'dish', t: '菜品' }
+    ], state.foodCat)}
+  </div>
+  <div class="food-search">
+    <span class="fs-ico">⌕</span>
+    <input id="foodSearch" type="search" placeholder="搜索食材或菜品" value="${state.foodQuery || ''}" autocomplete="off">
+    <span class="fs-count" id="foodCount">${isDish ? DISHES.length : list.length} ${isDish ? '道' : '种'}</span>
+  </div>
+  ${isDish ? `<div class="pill-note" style="margin:0 0 12px"><span class="i">🫗</span><span><b>外食的油通常比家里多 50% 以上。</b>点菜时优先选蒸、煮、白灼、清炒；重油菜用筷子在盘边刮一下。下列数值已包含做菜油，按「一份」估算，因店而异。</span></div>` : ''}
+  <div class="food-list" id="foodList">
+    ${isDish
+      ? DISHES.filter(d => !state.foodQuery || (d.name + d.note).includes(state.foodQuery)).map((d, i) => dishCardHTML(d, i)).join('')
+      : list.map((f, i) => foodCardHTML(f, i)).join('')}
+  </div>
+  ${cartFab()}
+  `;
+}
+
+/* ---------------- 页面：购物车结算 ---------------- */
+function cartItemHTML(it, idx) {
+  if (it.dish) {
+    const d = DISHES.find(x => x.id === it.id);
+    if (!d) return '';
+    return `<div class="cart-item">
+      <div class="ci-thumb">🍽</div>
+      <div class="ci-body">
+        <div class="ci-name">${d.name}<span class="ci-portion">${d.portion}</span></div>
+        <div class="ci-sub">碳 ${Math.round(d.c * it.serv)} · 蛋 ${Math.round(d.p * it.serv)} · 脂 ${Math.round(d.f * it.serv)} g</div>
+      </div>
+      <div class="ci-right">
+        <div class="stepper sm">
+          <button data-cart-serv="${idx}" data-d="-0.5">−</button>
+          <div class="g">${it.serv}<small>份</small></div>
+          <button data-cart-serv="${idx}" data-d="0.5">+</button>
+        </div>
+        <div class="ci-kcal">${Math.round(d.kcal * it.serv)} kcal</div>
+      </div>
+      <button class="ci-del" data-cart-del="${idx}">✕</button>
+    </div>`;
+  }
+  const f = FOODS.find(x => x.id === it.id);
+  if (!f) return '';
+  const oil = oilGrams(f, it.method || 'raw', it.g);
+  return `<div class="cart-item">
+    <div class="ci-thumb">${ICONS[f.icon]}</div>
+    <div class="ci-body">
+      <div class="ci-name">${f.name}<span class="ci-portion">${f.state}</span></div>
+      <div class="chips method-chips" style="margin:6px 0 0">
+        ${methodsFor(f).map(mid => `<button class="chip xs ${mid === it.method ? 'on' : ''}" data-cart-method="${idx}" data-mid="${mid}">${(METHODS.find(m => m.id === mid) || {}).name}</button>`).join('')}
+      </div>
+      <div class="ci-sub">${oil > 0.05 ? `含烹调油 ${round(oil, 1)} g` : '无额外用油'} · ${Math.round(f.p * it.g / 100)} g 蛋白</div>
+    </div>
+    <div class="ci-right">
+      <div class="stepper sm">
+        <button data-cart-g="${idx}" data-d="-10">−</button>
+        <div class="g">${it.g}<small>g</small></div>
+        <button data-cart-g="${idx}" data-d="10">+</button>
+      </div>
+    </div>
+    <button class="ci-del" data-cart-del="${idx}">✕</button>
+  </div>`;
+}
+
+function renderCart() {
+  const t = cartTotals();
+  const tg = cartTargetFor(state.cartSlot);
+  const rows = [
+    ['碳水', t.c, tg.c, '#ffd60a'],
+    ['蛋白质', t.p, tg.p, '#ff6482'],
+    ['脂肪', t.f, tg.f, '#64d2ff']
+  ].map(([label, val, target, color]) => {
+    const ratio = target > 0 ? val / target : 0;
+    const status = ratio > 1.15 ? 'over' : ratio < 0.85 ? 'under' : 'ok';
+    const pct = clamp(ratio * 100, 0, 100);
+    return `<div class="macro-bar ${status}">
+      <div class="mb-top"><span>${label}</span><span><b>${Math.round(val)}</b> / ${Math.round(target)} g</span></div>
+      <div class="mb-track"><i style="width:${pct}%;background:${status === 'ok' ? '#3ddc84' : status === 'over' ? '#ff453a' : '#ffd60a'}"></i></div>
+      <div class="mb-flag">${status === 'ok' ? '达标' : status === 'over' ? `超出 ${Math.round(val - target)} g` : `还差 ${Math.round(target - val)} g`}</div>
+    </div>`;
+  }).join('');
+
+  return `
+  <div class="hero" style="padding-bottom:6px">
+    <div class="kicker"><span class="dot"></span> 结算</div>
+    <h1 style="font-size:29px">这一餐，<br>够不够。</h1>
+    <p>购物车里的东西算总账，对照这一餐的目标；保存后自动记进今天。</p>
+  </div>
+
+  <div class="card tight" style="margin-bottom:14px">
+    <div class="card-title" style="margin-bottom:8px"><h3>这是哪一餐</h3><span class="card-hint">决定目标分配</span></div>
+    <div class="chips">
+      ${MEAL_SLOTS.map(s => `<button class="chip sm ${state.cartSlot === s.id ? 'on' : ''}" data-cart-slot="${s.id}">${s.name} ${Math.round(s.share * 100)}%</button>`).join('')}
+    </div>
+    <div class="cart-target-line">目标 ≈ ${Math.round(tg.kcal)} kcal · 碳 ${Math.round(tg.c)} · 蛋 ${Math.round(tg.p)} · 脂 ${Math.round(tg.f)} g</div>
+    <div class="cart-tip">${state.cartSlot === 'post' ? '💪 练后餐：碳水+蛋白优先，蔬菜少吃后吃，纤维会拖慢吸收。' : state.cartSlot === 'pre' ? '⚡️ 练前餐：碳水为主、少油少纤维，别吃太饱。' : state.cartSlot === 'snack' ? '🍎 加餐：优先蛋白或水果，控制总量。' : '🍽 正餐：先吃菜再吃主食，注意烹调油。'}</div>
+  </div>
+
+  <div class="card tight" style="margin-bottom:14px">
+    <div class="card-title" style="margin-bottom:4px"><h3>购物车</h3><span class="card-hint">${state.cart.length} 项</span></div>
+    ${state.cart.length ? state.cart.map((it, i) => cartItemHTML(it, i)).join('') : `<div class="empty-note">还没选东西。去「食物」页点「＋」加进来。</div>`}
+  </div>
+
+  <div class="card tight">
+    <div class="card-title" style="margin-bottom:10px"><h3>营养进度</h3><span class="card-hint">${t.oil > 0.05 ? `烹调油 ${round(t.oil, 1)} g` : ''}</span></div>
+    ${rows}
+    <div class="cart-total">合计 <b>${Math.round(t.kcal)}</b> kcal · 蛋白 ${Math.round(t.p)} g · 脂肪 ${Math.round(t.f)} g</div>
+    <button class="btn-primary" style="margin-top:14px" data-action="save-cart" ${state.cart.length ? '' : 'disabled'}>
+      <span class="shine"></span>记进今天（自动保存）
+    </button>
+    <button class="btn-secondary" style="margin-top:10px" data-action="clear-cart">清空购物车</button>
+  </div>
+  ${cartFab()}
+  `;
+}
+
 /* ---------------- 外食菜品 ---------------- */
 function openDishes() {
   const rows = DISHES.map(d => `<div class="dish-row">
@@ -1533,26 +1807,80 @@ function openScience() {
 function openFood(id) {
   const f = FOODS.find(x => x.id === id);
   if (!f) return;
-  const r = compute();
-  const per = 100;
+  state.foodDraft = { id: f.id, g: 100, method: methodsFor(f)[0] };
+  renderFoodSheet(f);
+  $('#sheetMask').classList.add('on');
+  $('#sheet').classList.add('on');
+}
+
+function renderFoodSheet(f) {
+  const d = state.foodDraft;
+  const oil = oilGrams(f, d.method, d.g);
+  const k = d.g / 100;
+  const kcal = Math.round(f.kcal * k + oil * 9);
   sheetHTML(`
     <div class="hero-ico">${ICONS[f.icon]}</div>
     <h2 style="text-align:center">${f.name}</h2>
     <div class="sub" style="text-align:center">${f.state} · 每 100 g</div>
     <div class="macro-grid" style="grid-template-columns:repeat(4,1fr);gap:8px">
-      ${['c', 'p', 'f'].map((k, i) => `<div class="stat" style="text-align:center"><div class="k">${['碳水', '蛋白', '脂肪'][i]}</div><div class="v" style="font-size:16px">${f[k]} g</div></div>`).join('')}
+      ${['c', 'p', 'f'].map((key, i) => `<div class="stat" style="text-align:center"><div class="k">${['碳水', '蛋白', '脂肪'][i]}</div><div class="v" style="font-size:16px">${f[key]} g</div></div>`).join('')}
       <div class="stat" style="text-align:center"><div class="k">热量</div><div class="v" style="font-size:16px">${f.kcal}</div></div>
-    </div>
-    <div class="macro-grid" style="grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px">
-      <div class="stat" style="text-align:center"><div class="k">膳食纤维</div><div class="v" style="font-size:16px">${f.fiber} g</div></div>
-      <div class="stat" style="text-align:center"><div class="k">1 ${f.unit.name.replace(/^一/, '')}</div><div class="v" style="font-size:16px">${f.unit.g} g</div></div>
     </div>
     <div class="sec"><h4>✔ 更好的做法</h4><p>${f.tip}</p></div>
     <div class="sec"><h4>🔬 为什么这么建议</h4><p>${f.why}</p></div>
-    ${giOf(f) ? `<div class="sec"><h4>📈 升糖指数</h4><p>GI ${giOf(f).value}（${giOf(f).level}）：${giOf(f).level === '高' ? '消化快、血糖上升快，训练后吃没问题，静息状态下容易饿。' : giOf(f).level === '中' ? '升糖速度中等，适合作为日常主食。' : '升糖慢、饱腹久，适合减脂期和非训练餐；练后要快速补糖时未必最优。'}</p></div>` : ''}
+    ${giOf(f) ? `<div class="sec"><h4>📈 升糖指数</h4><p>GI ${giOf(f).value}（${giOf(f).level}）</p></div>` : ''}
     ${f.macro ? `<div class="sec"><h4>🌿 关键微量营养素</h4><p>${f.macro.map(m => '· ' + m).join('<br>')}</p></div>` : ''}
-    <div class="sec"><h4>📏 换算参考</h4><p>1 ${f.unit.name.replace(/^一/, '')} ≈ ${f.unit.g} g。按你当前的每日目标（${r.scene.short}），配餐页会直接算出需要多少克、相当于几个${f.unit.name.replace(/^一/, '').replace(/^个/, '')}。</p></div>
-    <button class="btn-primary" style="margin-top:18px" data-add="${f.id}"><span class="shine"></span>加入本餐</button>
+
+    <div class="sec"><h4>🍳 这份怎么做</h4>
+      <div class="chips" style="margin-top:8px">
+        ${methodsFor(f).map(mid => {
+          const m = METHODS.find(x => x.id === mid);
+          return `<button class="chip sm ${d.method === mid ? 'on' : ''}" data-fd-method="${mid}">${m.name}</button>`;
+        }).join('')}
+      </div>
+      <div class="fd-qty">
+        <span>份量</span>
+        <div class="stepper sm">
+          <button data-fd-g="-20">−</button>
+          <div class="g">${d.g}<small>g</small></div>
+          <button data-fd-g="20">+</button>
+        </div>
+      </div>
+      <div class="oil-line ${oil > 0 ? 'has' : ''}" style="margin-top:10px">
+        ${oil > 0.05 ? `🫗 这一份约用油 ${round(oil, 1)} g（${Math.round(oil * 9)} kcal）` : '✔ 这个做法不额外用油'} · 合计 ${kcal} kcal
+      </div>
+    </div>
+
+    <div class="sec"><h4>🔄 营养相近的替换</h4>
+      <div class="chips" style="margin-top:8px">
+        ${FOODS.filter(x => x.cat === f.cat && x.id !== f.id && x[f.cat === 'fat' ? 'f' : f.cat === 'protein' ? 'p' : 'c'] > 0)
+          .map(x => ({ x, diff: Math.abs(x.kcal - f.kcal) + Math.abs(x.p - f.p) * 4 + Math.abs(x.c - f.c) * 4 }))
+          .sort((a, b) => a.diff - b.diff).slice(0, 3)
+          .map(o => `<button class="chip sm" data-swap-food="${o.x.id}">${o.x.name}</button>`).join('')}
+      </div>
+    </div>
+    <button class="btn-primary" style="margin-top:16px" data-fd-add="${f.id}"><span class="shine"></span>加入购物车</button>
+  `);
+}
+
+function openDish(id) {
+  const d = DISHES.find(x => x.id === id);
+  if (!d) return;
+  const similar = DISHES.filter(x => x.id !== d.id)
+    .map(x => ({ x, diff: Math.abs(x.kcal - d.kcal) + Math.abs(x.c - d.c) * 4 }))
+    .sort((a, b) => a.diff - b.diff).slice(0, 3);
+  sheetHTML(`
+    <h2>${d.name}</h2>
+    <div class="sub">${d.portion} · 已包含做菜油</div>
+    <div class="macro-grid" style="grid-template-columns:repeat(4,1fr);gap:8px">
+      <div class="stat" style="text-align:center"><div class="k">热量</div><div class="v" style="font-size:16px">${d.kcal}</div></div>
+      <div class="stat" style="text-align:center"><div class="k">碳水</div><div class="v" style="font-size:16px">${d.c} g</div></div>
+      <div class="stat" style="text-align:center"><div class="k">蛋白</div><div class="v" style="font-size:16px">${d.p} g</div></div>
+      <div class="stat" style="text-align:center"><div class="k">脂肪</div><div class="v" style="font-size:16px">${d.f} g</div></div>
+    </div>
+    <div class="sec"><h4>📝 说明</h4><p>${d.note}</p></div>
+    <div class="sec"><h4>🔄 营养相近的替换</h4><p>${similar.map(x => `${x.x.name}（${x.x.kcal} kcal）`).join(' · ')}</p></div>
+    <button class="btn-primary" style="margin-top:16px" data-addcart="dish:${d.id}"><span class="shine"></span>加入购物车</button>
   `);
 }
 
@@ -1655,7 +1983,7 @@ function closeSheet() {
 }
 
 /* ---------------- 渲染与导航 ---------------- */
-const SCREENS = { input: renderInput, result: renderResult, food: renderFood, meal: renderMeal, log: renderLog };
+const SCREENS = { input: renderInput, result: renderResult, food: renderShop, meal: renderCart, log: renderLog };
 
 function render(opts = {}) {
   const y = window.scrollY || window.pageYOffset || 0;
@@ -1714,7 +2042,7 @@ function go(screen) {
 
 /* ---------------- 事件 ---------------- */
 document.addEventListener('click', (ev) => {
-  const t = ev.target.closest('[data-action],[data-seg],[data-tab],[data-food],[data-pick],[data-step],[data-veg-toggle],[data-add],[data-slider],[data-tstep],[data-apply-tune],[data-reset-tune],[data-edit],[data-del],[data-del-now],[data-save-entry],[data-add-date],[data-cal],[data-day],[data-method],[data-traintime],[data-swap],[data-save-weight],[data-again]');
+  const t = ev.target.closest('[data-action],[data-seg],[data-tab],[data-food],[data-pick],[data-step],[data-veg-toggle],[data-add],[data-slider],[data-tstep],[data-apply-tune],[data-reset-tune],[data-edit],[data-del],[data-del-now],[data-save-entry],[data-add-date],[data-cal],[data-day],[data-method],[data-traintime],[data-swap],[data-save-weight],[data-again],[data-dish],[data-addcart],[data-fd-method],[data-fd-g],[data-fd-add],[data-cart-g],[data-cart-serv],[data-cart-method],[data-cart-del],[data-cart-slot],[data-swap-food]');
   if (!t) return;
 
   /* 底部导航 */
@@ -1762,6 +2090,61 @@ document.addEventListener('click', (ev) => {
   if (t.dataset.method) {
     const k = t.dataset.method, mid = t.dataset.mid;
     state.meal[k].method = mid;
+    save(); render(); return;
+  }
+
+  /* 购物车 */
+  if (t.dataset.addcart) {
+    const id = t.dataset.addcart;
+    const btn = t;
+    if (id.startsWith('dish:')) {
+      addToCart(id, { serv: 1 });
+    } else {
+      const fd = state.foodDraft || {};
+      addToCart(id, { g: fd.g || 100, method: fd.method });
+    }
+    flyToCart(btn);
+    if (document.querySelector('#sheet').classList.contains('on')) closeSheet();
+    render();
+    return;
+  }
+  if (t.dataset.fdMethod) { state.foodDraft.method = t.dataset.fdMethod; renderFoodSheet(slotFoodById(state.foodDraft.id)); return; }
+  if (t.dataset.fdG) {
+    state.foodDraft.g = clamp((state.foodDraft.g || 0) + parseInt(t.dataset.fdG, 10), 10, 1500);
+    renderFoodSheet(slotFoodById(state.foodDraft.id));
+    return;
+  }
+  if (t.dataset.swapFood) {
+    const f = FOODS.find(x => x.id === t.dataset.swapFood);
+    if (f) { state.foodDraft = { id: f.id, g: state.foodDraft.g, method: methodsFor(f)[0] }; renderFoodSheet(f); }
+    return;
+  }
+  if (t.dataset.fdAdd) {
+    const fd = state.foodDraft;
+    addToCart(t.dataset.fdAdd, { g: fd.g, method: fd.method });
+    closeSheet(); flyToCart(t); render(); return;
+  }
+  if (t.dataset.cartG) {
+    const i = +t.dataset.cartG, d = parseInt(t.dataset.d, 10);
+    state.cart[i].g = clamp(state.cart[i].g + d, 10, 1500);
+    save(); render(); return;
+  }
+  if (t.dataset.cartServ) {
+    const i = +t.dataset.cartServ, d = parseFloat(t.dataset.d);
+    state.cart[i].serv = clamp(round(state.cart[i].serv + d, 1), 0.5, 3);
+    save(); render(); return;
+  }
+  if (t.dataset.cartMethod) {
+    const i = +t.dataset.cartMethod;
+    state.cart[i].method = t.dataset.mid;
+    save(); render(); return;
+  }
+  if (t.dataset.cartDel) {
+    state.cart.splice(+t.dataset.cartDel, 1);
+    save(); render(); return;
+  }
+  if (t.dataset.cartSlot) {
+    state.cartSlot = t.dataset.cartSlot;
     save(); render(); return;
   }
 
@@ -1844,6 +2227,9 @@ document.addEventListener('click', (ev) => {
   if (t.dataset.action === 'import-data') { importFile(); return; }
   if (t.dataset.action === 'reminder') { downloadReminder(); return; }
   if (t.dataset.action === 'dishes') { openDishes(); return; }
+  if (t.dataset.action === 'cart') { go('meal'); return; }
+  if (t.dataset.action === 'clear-cart') { state.cart = []; save(); render(); return; }
+  if (t.dataset.action === 'save-cart') { saveCartAsMeal(); return; }
   if (t.dataset.action === 'add-meal') { openEntry(null); return; }
   if (t.dataset.action === 'goto-food') { go('food'); return; }
   if (t.dataset.action === 'goto-meal') { go('meal'); return; }
@@ -1856,6 +2242,7 @@ document.addEventListener('click', (ev) => {
 
   /* 食物卡 */
   if (t.dataset.food) { openFood(t.dataset.food); return; }
+  if (t.dataset.dish) { openDish(t.dataset.dish); return; }
 
   /* 配餐：选择食物 */
   if (t.dataset.pick) {

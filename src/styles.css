@@ -838,3 +838,104 @@ button,.chip,.tab,.food,.cal-cell,.reco-row,.slot,.log-row{touch-action:manipula
 .dish-macros{text-align:right;font-size:10px;color:var(--dim-2);white-space:nowrap;line-height:1.6}
 .dish-macros b{font-size:15px;color:var(--txt);font-weight:750}
 .lb-flag.none{background:rgba(255,255,255,.06);color:var(--dim-2)}
+
+/* ---------------- 选购 / 购物车 ---------------- */
+.add-btn{
+  width:36px;height:36px;flex:0 0 auto;border-radius:50%;
+  border:1px solid rgba(255,122,24,.35);
+  background:rgba(255,122,24,.14);color:var(--orange-2);
+  font-size:18px;font-weight:600;line-height:1;cursor:pointer;
+  display:grid;place-items:center;
+  transition:transform .25s var(--spring),background .2s;
+}
+.add-btn:active{transform:scale(.86);background:rgba(255,122,24,.3)}
+.add-btn.in{background:rgba(61,220,132,.16);border-color:rgba(61,220,132,.4);color:#3ddc84;font-size:15px}
+
+.cart-bar{
+  position:sticky;bottom:calc(94px + env(safe-area-inset-bottom));z-index:45;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  margin-top:16px;padding:12px 14px 12px 18px;border-radius:20px;
+  background:rgba(26,26,30,.92);border:1px solid rgba(255,122,24,.45);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  box-shadow:0 16px 40px -16px rgba(0,0,0,.9);
+}
+.cb-left{display:flex;align-items:center;gap:10px;min-width:0}
+.cb-count{
+  min-width:24px;height:24px;border-radius:99px;background:linear-gradient(180deg,#ffa63d,#ff6a00);
+  color:#231005;font-size:12px;font-weight:800;display:grid;place-items:center;padding:0 7px;
+}
+.cb-kcal{font-size:11.5px;color:var(--dim);font-variant-numeric:tabular-nums;white-space:nowrap}
+.cb-go{
+  flex:0 0 auto;border:0;border-radius:14px;padding:10px 16px;
+  background:linear-gradient(180deg,#ffa63d,#ff6a00);color:#231005;
+  font-family:inherit;font-size:13px;font-weight:750;cursor:pointer;
+  transition:transform .25s var(--spring);
+}
+.cb-go:active{transform:scale(.94)}
+.cart-fab{
+  z-index:45;display:flex;align-items:center;gap:8px;
+  padding:12px 16px;border-radius:99px;border:1px solid rgba(255,122,24,.4);
+  background:linear-gradient(180deg,#ffa63d,#ff6a00);color:#231005;
+  font-family:inherit;font-size:12.5px;font-weight:750;cursor:pointer;
+  box-shadow:0 12px 30px -10px rgba(255,106,0,.8);
+  transition:transform .3s var(--spring),box-shadow .3s;
+}
+.cart-fab:active{transform:scale(.94)}
+.cart-fab:not(.has){background:rgba(30,30,34,.9);color:var(--dim);border-color:rgba(255,255,255,.12);box-shadow:0 10px 24px -12px #000}
+.cart-ico{font-size:16px}
+.cart-badge{
+  position:absolute;top:-6px;right:-4px;min-width:20px;height:20px;border-radius:99px;
+  background:#ff375f;color:#fff;font-size:11px;font-weight:750;
+  display:grid;place-items:center;padding:0 5px;border:2px solid #0a0a0c;
+}
+.cart-kcal{letter-spacing:-.01em}
+
+
+.fly-dot{
+  position:fixed;width:12px;height:12px;border-radius:50%;z-index:99;
+  background:var(--orange-2);box-shadow:0 0 12px rgba(255,122,24,.9);
+  pointer-events:none;transition:transform .5s cubic-bezier(.4,0,.2,1),opacity .5s;
+}
+
+/* 购物车条目 */
+.cart-item{display:flex;gap:11px;align-items:flex-start;padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06);position:relative}
+.cart-item:last-child{border-bottom:0}
+.ci-thumb{width:44px;height:44px;flex:0 0 auto;border-radius:12px;background:rgba(255,255,255,.05);display:grid;place-items:center;font-size:20px}
+.ci-thumb svg{width:36px;height:36px}
+.ci-body{flex:1;min-width:0}
+.ci-name{font-size:13px;font-weight:700}
+.ci-portion{font-size:10px;color:var(--dim-2);font-weight:500;margin-left:6px}
+.ci-sub{font-size:10px;color:var(--dim-2);margin-top:4px;line-height:1.4}
+.ci-right{text-align:right;flex:0 0 auto}
+.ci-kcal{font-size:10.5px;color:var(--dim-2);margin-top:6px}
+.ci-del{
+  position:absolute;right:0;top:6px;width:22px;height:22px;border-radius:50%;
+  border:0;background:transparent;color:rgba(247,247,250,.3);font-size:11px;cursor:pointer;
+}
+.ci-del:active{color:#ff6482}
+.stepper.sm button{width:28px;height:28px;font-size:14px}
+.stepper.sm .g{font-size:15px;min-width:58px}
+.chip.xs{font-size:9.5px;padding:3px 7px;min-height:24px;gap:3px}
+.chip.xs.on{background:rgba(255,122,24,.2);border-color:rgba(255,122,24,.55);color:#ffb066}
+
+/* 营养进度条 */
+.macro-bar{margin-bottom:14px}
+.mb-top{display:flex;justify-content:space-between;font-size:11.5px;color:var(--dim);margin-bottom:6px}
+.mb-top b{font-size:13px;color:var(--txt);font-variant-numeric:tabular-nums}
+.mb-track{height:8px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden}
+.mb-track i{display:block;height:100%;border-radius:99px;transition:width .5s var(--ease)}
+.mb-flag{font-size:10px;margin-top:5px;font-weight:650}
+.macro-bar.over .mb-flag{color:#ff6b60}
+.macro-bar.under .mb-flag{color:#ffc078}
+.macro-bar.ok .mb-flag{color:#3ddc84}
+.macro-bar.over .mb-track{background:rgba(255,69,58,.18)}
+.macro-bar.under .mb-track{background:rgba(255,159,10,.16)}
+.macro-bar.ok .mb-track{background:rgba(61,220,132,.16)}
+.cart-target-line{font-size:10.5px;color:var(--dim-2);margin-top:10px}
+.cart-total{font-size:11.5px;color:var(--dim);text-align:center;margin-top:4px}
+.cart-total b{font-size:18px;color:var(--txt);font-variant-numeric:tabular-nums}
+.fd-qty{display:flex;align-items:center;justify-content:space-between;margin-top:12px;font-size:12px;color:var(--dim)}
+.dish-thumb{font-size:22px}
+.cart-tip{font-size:10.5px;color:rgba(255,183,120,.9);line-height:1.5;margin-top:8px}
+
+@media(min-width:521px){ .cart-fab{right:calc(50% - 240px)} }
