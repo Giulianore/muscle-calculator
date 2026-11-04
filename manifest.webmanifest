@@ -1,0 +1,19 @@
+{
+  "name": "Muscle Calculator · 健身饮食计算器",
+  "short_name": "肌肉计算器",
+  "description": "增肌、减脂、维持、休息四种场景的每日饮食配额，含 69 种食材、配餐换算、餐次记录与日历。",
+  "lang": "zh-CN",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "background_color": "#08080a",
+  "theme_color": "#08080a",
+  "categories": ["health", "fitness", "food"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

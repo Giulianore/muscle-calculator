@@ -1795,3 +1795,9 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet()
 if (state.screen === 'meal') ensureMeal();
 render();
 
+/* ---------------- PWA：注册 Service Worker（仅 http/https 生效） ---------------- */
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  });
+}

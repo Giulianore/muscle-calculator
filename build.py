@@ -33,6 +33,38 @@ out = out.replace("__BUILD__", VERSION)
 
 target = ROOT / "index.html"
 target.write_text(out, encoding="utf-8")
+# ---- PWA：生成带版本号的 Service Worker ----
+sw = f"""const VERSION = '{VERSION}';
+const CACHE = 'mc-' + VERSION;
+const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
+
+self.addEventListener('install', e => {{
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+}});
+
+self.addEventListener('activate', e => {{
+  e.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
+  );
+}});
+
+self.addEventListener('fetch', e => {{
+  if (e.request.method !== 'GET') return;
+  e.respondWith(
+    fetch(e.request)
+      .then(res => {{
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {{}});
+        return res;
+      }})
+      .catch(() => caches.match(e.request).then(r => r || caches.match('./index.html')))
+  );
+}});
+"""
+(ROOT / "sw.js").write_text(sw, encoding="utf-8")
+
 copy = ROOT.parent / "MuscleCalculator.html"
 try:
     copy.write_text(out, encoding="utf-8")
@@ -41,6 +73,9 @@ except OSError:
 share = ROOT / "share"
 if share.is_dir():
     (share / "index.html").write_text(out, encoding="utf-8")
+    for f in ["manifest.webmanifest", "sw.js", "icon-192.png", "icon-512.png", "icon-maskable-512.png", "icon-180.png"]:
+        if (ROOT / f).exists():
+            (share / f).write_bytes((ROOT / f).read_bytes())
 print(f"built {target}  ({len(out)/1024:.1f} KB)")
 if copy:
     print(f"copied {copy}")
