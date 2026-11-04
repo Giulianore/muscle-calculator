@@ -525,6 +525,7 @@ Object.assign(ICONS, {
   chips: S(P.chips()),
   icecream: S(P.icecream()),
   nut: S(P.nut('#b8864b')),
+  noodlecup: S(P.bowl('#f2d3a3')),
   soda: S(P.cup('#c8503a')),
   tea: S(P.cup('#c9a06e'))
 });
@@ -1331,6 +1332,55 @@ const FOODS = [
     tip: '一罐 330 ml 约 35 g 糖，等于 7 块方糖。',
     why: '纯添加糖、零营养，是膳食指南明确建议限制的一类。',
     ev: ['dietary']
+  },
+
+  {
+    id: 'instantnoodle', cat: 'snack', name: '泡面（含油包）', state: '每 100 g', icon: 'noodlecup',
+    kcal: 472, p: 9.5, c: 61.0, f: 21.0, fiber: 2.4,
+    unit: { name: '一包', g: 100 }, tag: '高钠高脂',
+    tip: '一包约 470 kcal，油包和粉包放一半就能少 60–80 kcal；汤别喝完。',
+    why: '面饼多为油炸，钠含量常超过一天建议量的一半，不能当正餐常吃。',
+    ev: ['cooking']
+  },
+  {
+    id: 'latiao', cat: 'snack', name: '辣条', state: '每 100 g', icon: 'chips',
+    kcal: 400, p: 12.0, c: 45.0, f: 19.0, fiber: 2.0,
+    unit: { name: '一小包', g: 30 }, tag: '高钠',
+    tip: '一小包 30 g 约 120 kcal，钠含量很高，吃完多喝水。',
+    why: '面筋吸油、调味重，蛋白看着不低但伴随大量油和盐。',
+    ev: ['dietary']
+  },
+  {
+    id: 'popcorn', cat: 'snack', name: '爆米花（奶油）', state: '每 100 g', icon: 'chips',
+    kcal: 459, p: 5.0, c: 60.0, f: 22.0, fiber: 6.0,
+    unit: { name: '一小桶', g: 50 }, tag: '高纤维高脂',
+    tip: '影院小桶轻松 500 kcal；选原味空气爆的能少一半脂肪。',
+    why: '纤维不错，但奶油版脂肪高，且很容易边看边吃完。',
+    ev: ['dietary']
+  },
+  {
+    id: 'sachima', cat: 'snack', name: '沙琪玛', state: '每 100 g', icon: 'cake',
+    kcal: 470, p: 6.0, c: 62.0, f: 22.0, fiber: 1.0,
+    unit: { name: '一块', g: 40 }, tag: '糖油',
+    tip: '一块 40 g 约 190 kcal，等于半碗饭，且幾乎没有蛋白质。',
+    why: '油炸面条+糖浆，典型的糖油混合物。',
+    ev: ['dietary']
+  },
+  {
+    id: 'eggpie', cat: 'snack', name: '蛋黄派', state: '每 100 g', icon: 'cookie',
+    kcal: 380, p: 6.0, c: 50.0, f: 18.0, fiber: 1.2,
+    unit: { name: '一个', g: 30 }, tag: '糖油',
+    tip: '一个约 115 kcal，常被当早餐，其实蛋白很少、糖不少。',
+    why: '夹心奶油+糖，饱腹感差，不适合替代正餐。',
+    ev: ['dietary']
+  },
+  {
+    id: 'fries', cat: 'snack', name: '薯条（快餐）', state: '每 100 g', icon: 'chips',
+    kcal: 312, p: 3.4, c: 41.0, f: 15.0, fiber: 3.8,
+    unit: { name: '中份', g: 115 }, tag: '油炸',
+    tip: '中份约 360 kcal，蘸酱再加 50–100 kcal。',
+    why: '土豆本身才 77 kcal/100 g，油炸后翻了 4 倍。',
+    ev: ['cooking']
   }
 ];
 
@@ -1374,6 +1424,7 @@ const OIL_EVIDENCE = {
 /* 每种食材可选的做法 */
 function methodsFor(food) {
   const id = food.id;
+  if (food.cat === 'snack') return ['raw'];   // 零食是成品，不涉及做法
   if (food.cat === 'fat') return ['raw'];
   if (['milk', 'yogurt', 'whey', 'soymilk'].includes(id)) return ['raw', 'boil'];
   if (['banana', 'apple', 'orange', 'pear', 'grape', 'strawberry', 'kiwi', 'dragonfruit', 'blueberry'].includes(id)) return ['raw', 'cold', 'boil'];

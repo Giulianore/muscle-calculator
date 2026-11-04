@@ -939,3 +939,31 @@ button,.chip,.tab,.food,.cal-cell,.reco-row,.slot,.log-row{touch-action:manipula
 .cart-tip{font-size:10.5px;color:rgba(255,183,120,.9);line-height:1.5;margin-top:8px}
 
 @media(min-width:521px){ .cart-fab{right:calc(50% - 240px)} }
+
+/* ---------------- 选购实时进度 ---------------- */
+.shop-progress{
+  margin:0 0 14px;padding:12px 14px;border-radius:16px;
+  background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.08);
+}
+.sp-head{display:flex;justify-content:space-between;font-size:10.5px;color:var(--dim-2);margin-bottom:9px}
+.sp-slot{color:var(--orange-2);font-weight:650}
+.sp-row{display:grid;grid-template-columns:34px 1fr 76px;align-items:center;gap:9px;margin-bottom:7px}
+.sp-row:last-child{margin-bottom:0}
+.sp-label{font-size:10.5px;color:var(--dim)}
+.sp-track{height:6px;border-radius:99px;background:rgba(255,255,255,.08);overflow:hidden}
+.sp-track i{display:block;height:100%;border-radius:99px;width:0;
+  background:#ffd60a;
+  transition:width .55s cubic-bezier(.32,.72,0,1), background-color .35s ease;}
+.sp-val{font-size:10px;color:var(--dim-2);text-align:right;font-variant-numeric:tabular-nums}
+.sp-row.ok .sp-track i{background:#3ddc84}
+.sp-row.under .sp-track i{background:#ffd60a}
+.sp-row.over .sp-track i{background:#ff453a}
+.sp-row.ok .sp-val{color:#3ddc84}
+.sp-row.over .sp-val{color:#ff8a80}
+
+/* 购物车弹窗 */
+.cs-count{font-size:11px;font-weight:600;color:var(--orange-2);background:rgba(255,122,24,.14);padding:3px 8px;border-radius:99px}
+.cs-total{text-align:center;font-size:12px;color:var(--dim);margin-top:14px}
+.cs-total b{font-size:20px;color:var(--txt);font-variant-numeric:tabular-nums}
+.cb-left{background:none;border:0;padding:0;cursor:pointer;display:flex;align-items:center;gap:10px;font-family:inherit}
+.cart-wrap{display:contents}

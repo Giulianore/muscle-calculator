@@ -1614,10 +1614,10 @@ function cartFab() {
   const t = cartTotals();
   if (!n) return '';
   return `<div class="cart-bar">
-    <div class="cb-left">
+    <button class="cb-left" data-action="open-cart">
       <span class="cb-count">${n}</span>
       <span class="cb-kcal">${Math.round(t.kcal)} kcal · 蛋 ${Math.round(t.p)} g</span>
-    </div>
+    </button>
     <button class="cb-go" data-action="cart">去结算 →</button>
   </div>`;
 }
@@ -1643,14 +1643,76 @@ function renderShop() {
     <input id="foodSearch" type="search" placeholder="搜索食材或菜品" value="${state.foodQuery || ''}" autocomplete="off">
     <span class="fs-count" id="foodCount">${isDish ? DISHES.length : list.length} ${isDish ? '道' : '种'}</span>
   </div>
+  ${shopProgressHTML()}
   ${isDish ? `<div class="pill-note" style="margin:0 0 12px"><span class="i">🫗</span><span><b>外食的油通常比家里多 50% 以上。</b>点菜时优先选蒸、煮、白灼、清炒；重油菜用筷子在盘边刮一下。下列数值已包含做菜油，按「一份」估算，因店而异。</span></div>` : ''}
   <div class="food-list" id="foodList">
     ${isDish
       ? DISHES.filter(d => !state.foodQuery || (d.name + d.note).includes(state.foodQuery)).map((d, i) => dishCardHTML(d, i)).join('')
       : list.map((f, i) => foodCardHTML(f, i)).join('')}
   </div>
-  ${cartFab()}
+  <div class="cart-wrap">${cartFab()}</div>
   `;
+}
+
+/* 选购页的实时营养进度（局部更新，不重绘整页） */
+function shopProgressHTML() {
+  const t = cartTotals();
+  const tg = cartTargetFor(state.cartSlot);
+  const rows = [
+    ['碳水', t.c, tg.c], ['蛋白', t.p, tg.p], ['脂肪', t.f, tg.f]
+  ].map(([label, val, target]) => {
+    const ratio = target > 0 ? val / target : 0;
+    const status = ratio > 1.15 ? 'over' : ratio < 0.85 ? 'under' : 'ok';
+    const pct = clamp(ratio * 100, 0, 100);
+    return `<div class="sp-row ${status}" data-sp="${label}">
+      <span class="sp-label">${label}</span>
+      <div class="sp-track"><i style="width:${pct}%"></i></div>
+      <span class="sp-val">${Math.round(val)}/${Math.round(target)}</span>
+    </div>`;
+  }).join('');
+  return `<div class="shop-progress" id="shopProgress">
+    <div class="sp-head"><span>这一餐进度</span><span class="sp-slot">${
+      (MEAL_SLOTS.find(x => x.id === state.cartSlot) || {}).name || ''
+    } · ${Math.round(t.kcal)} kcal</span></div>
+    ${rows}
+  </div>`;
+}
+
+/* 只刷新购物车相关区域，避免整页重绘造成闪屏 */
+function refreshShop() {
+  const bar = document.querySelector('.cart-wrap');
+  if (bar) bar.innerHTML = cartFab();
+  updateShopProgress();
+  document.querySelectorAll('[data-addcart]').forEach(btn => {
+    const id = btn.dataset.addcart;
+    const inCart = id.startsWith('dish:')
+      ? state.cart.some(c => c.dish && c.id === id.slice(5))
+      : state.cart.some(c => !c.dish && c.id === id);
+    btn.classList.toggle('in', inCart);
+    btn.textContent = inCart ? '✓' : '＋';
+  });
+}
+
+function updateShopProgress() {
+  const el = document.querySelector('#shopProgress');
+  if (!el) return;
+  const t = cartTotals();
+  const tg = cartTargetFor(state.cartSlot);
+  const pairs = [['碳水', t.c, tg.c], ['蛋白', t.p, tg.p], ['脂肪', t.f, tg.f]];
+  const rows = el.querySelectorAll('.sp-row');
+  pairs.forEach(([label, val, target], i) => {
+    const row = rows[i];
+    if (!row) return;
+    const ratio = target > 0 ? val / target : 0;
+    const status = ratio > 1.15 ? 'over' : ratio < 0.85 ? 'under' : 'ok';
+    row.className = `sp-row ${status}`;
+    const fill = row.querySelector('.sp-track i');
+    if (fill) fill.style.width = clamp(ratio * 100, 0, 100) + '%';
+    const v = row.querySelector('.sp-val');
+    if (v) v.textContent = `${Math.round(val)}/${Math.round(target)}`;
+  });
+  const slot = el.querySelector('.sp-slot');
+  if (slot) slot.textContent = `${(MEAL_SLOTS.find(x => x.id === state.cartSlot) || {}).name || ''} · ${Math.round(t.kcal)} kcal`;
 }
 
 /* ---------------- 页面：购物车结算 ---------------- */
@@ -1682,9 +1744,9 @@ function cartItemHTML(it, idx) {
     <div class="ci-thumb">${ICONS[f.icon]}</div>
     <div class="ci-body">
       <div class="ci-name">${f.name}<span class="ci-portion">${f.state}</span></div>
-      <div class="chips method-chips" style="margin:6px 0 0">
+      ${f.cat === 'snack' ? '' : `<div class="chips method-chips" style="margin:6px 0 0">
         ${methodsFor(f).map(mid => `<button class="chip xs ${mid === it.method ? 'on' : ''}" data-cart-method="${idx}" data-mid="${mid}">${(METHODS.find(m => m.id === mid) || {}).name}</button>`).join('')}
-      </div>
+      </div>`}
       <div class="ci-sub">${oil > 0.05 ? `含烹调油 ${round(oil, 1)} g` : '无额外用油'} · ${Math.round(f.p * it.g / 100)} g 蛋白</div>
     </div>
     <div class="ci-right">
@@ -1746,8 +1808,41 @@ function renderCart() {
     </button>
     <button class="btn-secondary" style="margin-top:10px" data-action="clear-cart">清空购物车</button>
   </div>
-  ${cartFab()}
+  <div class="cart-wrap">${cartFab()}</div>
   `;
+}
+
+/* ---------------- 购物车弹窗 ---------------- */
+function openCartSheet() {
+  renderCartSheet();
+  $('#sheetMask').classList.add('on');
+  $('#sheet').classList.add('on');
+}
+
+function renderCartSheet() {
+  const t = cartTotals();
+  const tg = cartTargetFor(state.cartSlot);
+  $('#sheetInner').innerHTML = `<div class="grab"></div>
+    <div class="cart-sheet">
+      <h2 style="display:flex;align-items:center;gap:8px">购物车 <span class="cs-count">${state.cart.length} 项</span></h2>
+      <div class="sub">${(MEAL_SLOTS.find(x => x.id === state.cartSlot) || {}).name} · 目标 ${Math.round(tg.kcal)} kcal</div>
+      ${state.cart.length ? state.cart.map((it, i) => cartItemHTML(it, i)).join('') : `<div class="empty-note">购物车是空的</div>`}
+      <div class="cs-total">合计 <b>${Math.round(t.kcal)}</b> kcal · 碳 ${Math.round(t.c)} · 蛋 ${Math.round(t.p)} · 脂 ${Math.round(t.f)} g</div>
+      <div class="btn-row" style="margin-top:14px">
+        <button class="btn-secondary" data-action="clear-cart">清空</button>
+        <button class="btn-primary" style="min-height:44px" data-action="cart"><span class="shine"></span>去结算 →</button>
+      </div>
+    </div>`;
+}
+
+/* 购物车变更后：局部刷新，不重绘整页 */
+function afterCartChange() {
+  save();
+  if (document.querySelector('#sheet').classList.contains('on') && document.querySelector('#sheetInner .cart-sheet')) {
+    renderCartSheet();
+  }
+  if (state.screen === 'food') refreshShop();
+  else if (state.screen === 'meal') render();
 }
 
 /* ---------------- 外食菜品 ---------------- */
@@ -1831,7 +1926,7 @@ function renderFoodSheet(f) {
     ${giOf(f) ? `<div class="sec"><h4>📈 升糖指数</h4><p>GI ${giOf(f).value}（${giOf(f).level}）</p></div>` : ''}
     ${f.macro ? `<div class="sec"><h4>🌿 关键微量营养素</h4><p>${f.macro.map(m => '· ' + m).join('<br>')}</p></div>` : ''}
 
-    <div class="sec"><h4>🍳 这份怎么做</h4>
+    ${f.cat === 'snack' ? `<div class="sec"><h4>🍳 做法</h4><p>零食是已经加工好的成品，不涉及做法与额外用油，按包装上的份量直接计就行。</p></div>` : `<div class="sec"><h4>🍳 这份怎么做</h4>
       <div class="chips" style="margin-top:8px">
         ${methodsFor(f).map(mid => {
           const m = METHODS.find(x => x.id === mid);
@@ -1849,7 +1944,7 @@ function renderFoodSheet(f) {
       <div class="oil-line ${oil > 0 ? 'has' : ''}" style="margin-top:10px">
         ${oil > 0.05 ? `🫗 这一份约用油 ${round(oil, 1)} g（${Math.round(oil * 9)} kcal）` : '✔ 这个做法不额外用油'} · 合计 ${kcal} kcal
       </div>
-    </div>
+    </div>`}
 
     <div class="sec"><h4>🔄 营养相近的替换</h4>
       <div class="chips" style="margin-top:8px">
@@ -2105,7 +2200,7 @@ document.addEventListener('click', (ev) => {
     }
     flyToCart(btn);
     if (document.querySelector('#sheet').classList.contains('on')) closeSheet();
-    render();
+    refreshShop();
     return;
   }
   if (t.dataset.fdMethod) { state.foodDraft.method = t.dataset.fdMethod; renderFoodSheet(slotFoodById(state.foodDraft.id)); return; }
@@ -2127,21 +2222,21 @@ document.addEventListener('click', (ev) => {
   if (t.dataset.cartG) {
     const i = +t.dataset.cartG, d = parseInt(t.dataset.d, 10);
     state.cart[i].g = clamp(state.cart[i].g + d, 10, 1500);
-    save(); render(); return;
+    afterCartChange(); return;
   }
   if (t.dataset.cartServ) {
     const i = +t.dataset.cartServ, d = parseFloat(t.dataset.d);
     state.cart[i].serv = clamp(round(state.cart[i].serv + d, 1), 0.5, 3);
-    save(); render(); return;
+    afterCartChange(); return;
   }
   if (t.dataset.cartMethod) {
     const i = +t.dataset.cartMethod;
     state.cart[i].method = t.dataset.mid;
-    save(); render(); return;
+    afterCartChange(); return;
   }
   if (t.dataset.cartDel) {
     state.cart.splice(+t.dataset.cartDel, 1);
-    save(); render(); return;
+    afterCartChange(); return;
   }
   if (t.dataset.cartSlot) {
     state.cartSlot = t.dataset.cartSlot;
@@ -2227,8 +2322,9 @@ document.addEventListener('click', (ev) => {
   if (t.dataset.action === 'import-data') { importFile(); return; }
   if (t.dataset.action === 'reminder') { downloadReminder(); return; }
   if (t.dataset.action === 'dishes') { openDishes(); return; }
-  if (t.dataset.action === 'cart') { go('meal'); return; }
-  if (t.dataset.action === 'clear-cart') { state.cart = []; save(); render(); return; }
+  if (t.dataset.action === 'cart') { closeSheet(); go('meal'); return; }
+  if (t.dataset.action === 'open-cart') { openCartSheet(); return; }
+  if (t.dataset.action === 'clear-cart') { state.cart = []; afterCartChange(); return; }
   if (t.dataset.action === 'save-cart') { saveCartAsMeal(); return; }
   if (t.dataset.action === 'add-meal') { openEntry(null); return; }
   if (t.dataset.action === 'goto-food') { go('food'); return; }
