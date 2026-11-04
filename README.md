@@ -2,9 +2,9 @@
 
 增肌 / 减脂 / 维持 / 休息 四种场景的饮食计算器，单文件网页。
 
-在线使用：**https://<你的用户名>.github.io/muscle-calculator/**
+在线使用：**https://giulianore.github.io/muscle-calculator/**
 
-## 本地修改流程
+## 本地修改流程（改完 push 即自动上线）
 
 ```bash
 python3 build.py          # 把 src/ 打包成 index.html
